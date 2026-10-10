@@ -1,0 +1,176 @@
+@import '@fontsource/cairo/400.css';
+@import '@fontsource/cairo/600.css';
+@import '@fontsource/cairo/700.css';
+@import '@fontsource/cairo/800.css';
+@import '@fontsource/cairo/900.css';
+@import '@fontsource/tajawal/400.css';
+@import '@fontsource/tajawal/700.css';
+@import 'primeicons/primeicons.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
+    direction: rtl;
+    text-align: right;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-800 antialiased min-h-screen;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* PrimeVue Component Polish */
+.p-component {
+  font-family: 'Cairo', 'Tajawal', sans-serif !important;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  background-color: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+  font-size: 0.925rem;
+  border-bottom: 2px solid #e2e8f0;
+  text-align: right;
+}
+
+.p-datatable .p-datatable-tbody > tr {
+  transition: background-color 0.15s ease-in-out;
+}
+
+.p-datatable .p-datatable-tbody > tr:hover {
+  background-color: #f1f5f9;
+}
+
+.p-dialog .p-dialog-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1.25rem 1.5rem;
+}
+
+.p-dialog .p-dialog-footer {
+  border-top: 1px solid #e2e8f0;
+  padding: 1rem 1.5rem;
+}
+
+.p-tag {
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+
+/* Print CSS Styles */
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt;
+    direction: rtl !important;
+    text-align: right !important;
+  }
+
+  .no-print,
+  .p-toast,
+  .p-dialog-mask,
+  .p-confirmdialog,
+  header,
+  nav,
+  button,
+  .app-navigation {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+    width: 100% !important;
+    visibility: visible !important;
+  }
+
+  .print-page-wrapper {
+    page-break-after: always;
+    break-after: page;
+    min-height: 98vh;
+    padding-bottom: 20px;
+  }
+
+  .print-page-wrapper:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Table styling for crisp official printing */
+  .official-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    margin-bottom: 15px;
+  }
+
+  .official-print-table th,
+  .official-print-table td {
+    border: 1.5px solid #1e293b;
+    padding: 8px 10px;
+    text-align: right;
+  }
+
+  .official-print-table th {
+    background-color: #e2e8f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 800;
+    color: #000;
+  }
+
+  .official-print-table .family-separator-row td {
+    background-color: #cbd5e1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 900 !important;
+    color: #000 !important;
+    border-top: 2px solid #000 !important;
+    border-bottom: 2px solid #000 !important;
+  }
+}
+
+/* Hide license badge */
+#p-license-host,
+div[id="p-license-host"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

@@ -1,0 +1,11 @@
+{
+  "busCount": 28,
+  "defaultMaxFamilies": 8,
+  "defaultMaxPersons": 40,
+  "overrides": {
+    "2": {
+      "maxFamilies": 3,
+      "maxPersons": 15
+    }
+  }
+}
