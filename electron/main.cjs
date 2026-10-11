@@ -6,21 +6,28 @@ const http = require('http');
 let mainWindow = null;
 let serverProcess = null;
 const PORT = process.env.PORT || 3000;
+const targetUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const isRemoteServer = !!process.env.SERVER_URL && !process.env.SERVER_URL.includes('localhost') && !process.env.SERVER_URL.includes('127.0.0.1');
 
 function checkServerReady(cb) {
-  const req = http.get(`http://127.0.0.1:${PORT}/api/state`, (res) => {
+  const checkUrl = `${targetUrl}/api/state`;
+  const req = http.get(checkUrl, (res) => {
     cb(res.statusCode < 500);
   });
   req.on('error', () => {
     cb(false);
   });
-  req.setTimeout(800, () => {
+  req.setTimeout(1200, () => {
     req.destroy();
     cb(false);
   });
 }
 
 function startBackendServer() {
+  if (isRemoteServer) {
+    console.log('Connecting to remote server at:', targetUrl);
+    return;
+  }
   checkServerReady((isReady) => {
     if (isReady) {
       console.log('Server is already running on port', PORT);
@@ -56,7 +63,6 @@ function createWindow() {
     }
   });
 
-  const targetUrl = `http://localhost:${PORT}`;
 
   const pollAndLoad = (retries = 30) => {
     checkServerReady((ready) => {
