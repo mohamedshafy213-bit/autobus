@@ -127,7 +127,7 @@
       <!-- Filters and Table Controls -->
       <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         
-        <!-- Status Filter Tabs: all / arrived / not arrived -->
+        <!-- Status Filter Tabs: all / arrived / not arrived / partial attendance -->
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs font-bold text-slate-500 me-1">التصفية:</span>
           <button
@@ -165,6 +165,19 @@
             ]"
           >
             لم يحضر ({{ stats.remainingStudents }})
+          </button>
+
+          <button
+            @click="store.statusFilter = 'partial_attendance'"
+            :class="[
+              'px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5',
+              store.statusFilter === 'partial_attendance'
+                ? 'bg-purple-700 text-white shadow-sm'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+            ]"
+          >
+            <i class="pi pi-user-minus text-[10px]"></i>
+            أسر بها غائبين ({{ stats.partialAttendanceStudents }})
           </button>
         </div>
 
@@ -234,20 +247,38 @@
         </Column>
 
         <!-- Family Count -->
-        <Column header="المرافقين" sortable style="width: 10%;">
+        <Column header="المرافقين" sortable style="width: 14%;">
           <template #body="{ data }">
-            <span class="font-mono font-bold text-slate-700 text-xs">
-              {{ (data.families || []).length }} مرافق
-            </span>
+            <div class="space-y-0.5">
+              <span class="font-mono font-bold text-slate-700 text-xs block">
+                {{ (data.families || []).length }} مرافق
+              </span>
+              <!-- If seated and some members were absent -->
+              <span
+                v-if="data.bus_number && data.families && data.families.length > 0 && data.families.some(m => !m.attended)"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200"
+              >
+                <i class="pi pi-user-minus text-[9px]"></i>
+                غائب {{ data.families.filter(m => !m.attended).length }}
+              </span>
+            </div>
           </template>
         </Column>
 
         <!-- Total Persons (1 + family) -->
         <Column header="إجمالي الأفراد" sortable style="width: 12%;">
           <template #body="{ data }">
-            <span class="font-mono font-black text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs">
-              {{ data.persons_count }} فرد
-            </span>
+            <div class="space-y-0.5">
+              <span class="font-mono font-black text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
+                {{ data.persons_count }} فرد
+              </span>
+              <span
+                v-if="data.bus_number && data.total_registered_persons && data.total_registered_persons > data.persons_count"
+                class="text-[10px] text-slate-400 block font-semibold"
+              >
+                من أصل {{ data.total_registered_persons }} مسجل
+              </span>
+            </div>
           </template>
         </Column>
 
@@ -288,16 +319,40 @@
         <Column header="الإجراءات" style="width: 15%; text-align: center;">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1.5">
-              <!-- If Not Arrived: "تسجيل حضور" button -->
-              <Button
-                v-if="!data.bus_number"
-                label="تسجيل حضور"
-                icon="pi pi-check"
-                size="small"
-                class="!bg-emerald-600 !border-emerald-600 !text-white !font-bold !text-xs !py-1.5 !px-3 shadow-sm hover:!bg-emerald-700"
-                :disabled="store.isWriteDisabled"
-                @click="openBusPicker(data, 'seat')"
-              />
+              <!-- If Not Arrived: Attendance / Seating button -->
+              <div v-if="!data.bus_number" class="flex items-center gap-1">
+                <Button
+                  v-if="store.settings.autoSeating"
+                  label="تسكين تلقائي ⚡"
+                  icon="pi pi-bolt"
+                  size="small"
+                  class="!bg-amber-600 !border-amber-600 !text-white !font-bold !text-xs !py-1.5 !px-3 shadow-sm hover:!bg-amber-700"
+                  :disabled="store.isWriteDisabled"
+                  title="تسجيل حضور وتسكين تلقائي فوري في أول أتوبيس متاح"
+                  @click="handleQuickAutoSeat(data)"
+                />
+                <Button
+                  v-else
+                  label="تسجيل حضور"
+                  icon="pi pi-check"
+                  size="small"
+                  class="!bg-emerald-600 !border-emerald-600 !text-white !font-bold !text-xs !py-1.5 !px-3 shadow-sm hover:!bg-emerald-700"
+                  :disabled="store.isWriteDisabled"
+                  @click="openBusPicker(data, 'seat')"
+                />
+
+                <Button
+                  v-if="store.settings.autoSeating"
+                  icon="pi pi-cog"
+                  size="small"
+                  severity="secondary"
+                  outlined
+                  class="!font-bold !text-xs !py-1.5 !px-2"
+                  title="اختيار يدوي مخصص وفحص أفراد الأسرة"
+                  :disabled="store.isWriteDisabled"
+                  @click="openBusPicker(data, 'seat')"
+                />
+              </div>
 
               <!-- If Arrived: "نقل لأتوبيس آخر" & "إلغاء الحضور" -->
               <template v-else>
@@ -337,6 +392,9 @@
                 <i class="pi pi-users text-emerald-600"></i>
                 أفراد أسرة الطالب: {{ data.name }} ({{ (data.families || []).length }} أفراد)
               </span>
+              <span v-if="data.bus_number" class="text-xs font-bold text-slate-500 font-mono">
+                الحاضرين فعلياً بالأتوبيس: {{ data.persons_count }} فرد (طالب + {{ data.attended_members_count || 0 }} مرافقين)
+              </span>
             </div>
 
             <div v-if="!data.families || data.families.length === 0" class="text-xs text-slate-400 italic">
@@ -347,9 +405,18 @@
               <div
                 v-for="member in data.families"
                 :key="member.id"
-                class="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs text-xs space-y-1"
+                class="p-2.5 rounded-lg border text-xs space-y-1 shadow-2xs transition-all"
+                :class="data.bus_number ? (member.attended ? 'bg-emerald-50/70 border-emerald-300' : 'bg-red-50/60 border-red-200 opacity-80') : 'bg-white border-slate-200'"
               >
-                <div class="font-bold text-slate-800">{{ member.name }}</div>
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-slate-800">{{ member.name }}</span>
+                  <Tag
+                    v-if="data.bus_number"
+                    :value="member.attended ? 'حضر بالأوتوبيس ✓' : 'لم يحضر (غائب)'"
+                    :severity="member.attended ? 'success' : 'danger'"
+                    class="!text-[10px] !py-0.5"
+                  />
+                </div>
                 <div class="flex items-center justify-between text-slate-500 text-[11px]">
                   <span>القرابة: <strong>{{ member.relation || '—' }}</strong></span>
                   <span class="font-mono">{{ member.national_id || '—' }}</span>
@@ -386,6 +453,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useBusesStore } from '../stores/busesStore.js';
 import BusPickerDialog from '../components/BusPickerDialog.vue';
 import CheckInModal from '../components/CheckInModal.vue';
+import { playSuccessSound } from '../utils/audioUtils.js';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 
@@ -429,16 +497,47 @@ function resetAllFilters() {
   store.busFilter = null;
 }
 
-// Enter on search box: if exactly 1 match, open bus picker!
+// Enter on search box: if exactly 1 match, auto-seat or open bus picker!
 function handleSearchEnter() {
   const matches = filteredStudents.value;
   if (matches.length === 1) {
     const student = matches[0];
     if (!student.bus_number) {
-      openBusPicker(student, 'seat');
+      if (store.settings.autoSeating) {
+        handleQuickAutoSeat(student);
+      } else {
+        openBusPicker(student, 'seat');
+      }
     } else {
       openBusPicker(student, 'move');
     }
+  }
+}
+
+async function handleQuickAutoSeat(student) {
+  try {
+    const result = await store.autoSeatFamily(student.military_number);
+    playSuccessSound();
+    toast.add({
+      severity: 'success',
+      summary: 'تم التسكين التلقائي ⚡',
+      detail: `تم تسجيل حضور وتسكين أسرة الطالب ${student.name} في أتوبيس رقم ${result.busNumber}`,
+      life: 4000
+    });
+    handleSeatedSuccess({
+      studentNumber: student.military_number,
+      studentName: student.name,
+      busNumber: result.busNumber,
+      totalPersons: student.persons_count
+    });
+  } catch (err) {
+    console.error('Auto seat error:', err);
+    toast.add({
+      severity: 'error',
+      summary: 'تعذر التسكين التلقائي',
+      detail: err.message || 'حدث خطأ أثناء التسكين التلقائي',
+      life: 5000
+    });
   }
 }
 

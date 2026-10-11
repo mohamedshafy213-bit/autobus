@@ -18,50 +18,19 @@
       <!-- Bus Manager -->
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-1">
-          مدير الأتوبيس <span class="text-red-500">*</span>
+          قائد المأمورية <span class="text-red-500">*</span>
         </label>
         <InputText
           v-model="staff.manager"
-          placeholder="أدخل اسم مدير الأتوبيس"
+          placeholder="أدخل اسم قائد المأمورية"
           class="w-full font-bold"
           :class="{ 'p-invalid': submitted && !staff.manager.trim() }"
         />
         <small v-if="submitted && !staff.manager.trim()" class="text-red-500 text-xs">
-          اسم مدير الأتوبيس مطلوب
+          اسم قائد المأمورية مطلوب
         </small>
       </div>
 
-      <!-- Driver -->
-      <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">
-          السائق <span class="text-red-500">*</span>
-        </label>
-        <InputText
-          v-model="staff.driver"
-          placeholder="أدخل اسم سائق الأتوبيس"
-          class="w-full font-bold"
-          :class="{ 'p-invalid': submitted && !staff.driver.trim() }"
-        />
-        <small v-if="submitted && !staff.driver.trim()" class="text-red-500 text-xs">
-          اسم السائق مطلوب
-        </small>
-      </div>
-
-      <!-- Security -->
-      <div>
-        <label class="block text-xs font-bold text-slate-700 mb-1">
-          مسؤول الأمن <span class="text-red-500">*</span>
-        </label>
-        <InputText
-          v-model="staff.security"
-          placeholder="أدخل اسم مسؤول الأمن"
-          class="w-full font-bold"
-          :class="{ 'p-invalid': submitted && !staff.security.trim() }"
-        />
-        <small v-if="submitted && !staff.security.trim()" class="text-red-500 text-xs">
-          اسم مسؤول الأمن مطلوب
-        </small>
-      </div>
     </div>
 
     <template #footer>
@@ -106,9 +75,7 @@ const visible = ref(props.modelValue);
 const submitted = ref(false);
 
 const staff = reactive({
-  manager: '',
-  driver: '',
-  security: ''
+  manager: ''
 });
 
 const dialogTitle = computed(() => {
@@ -124,8 +91,6 @@ function loadStaffFromStorage() {
     if (saved) {
       const parsed = JSON.parse(saved);
       staff.manager = parsed.manager || '';
-      staff.driver = parsed.driver || '';
-      staff.security = parsed.security || '';
     }
   } catch (err) {
     console.error('Error loading print staff:', err);
@@ -146,11 +111,11 @@ watch(visible, (val) => {
 
 function validate() {
   submitted.value = true;
-  if (!staff.manager.trim() || !staff.driver.trim() || !staff.security.trim()) {
+  if (!staff.manager.trim()) {
     toast.add({
       severity: 'warn',
       summary: 'بيانات غير مكتملة',
-      detail: 'يرجى إدخال أسماء مدير الأتوبيس والسائق ومسؤول الأمن.',
+      detail: 'يرجى إدخال اسم قائد المأمورية.',
       life: 3000
     });
     return false;
@@ -159,9 +124,7 @@ function validate() {
   // Save to localStorage
   try {
     localStorage.setItem('autobus_print_staff', JSON.stringify({
-      manager: staff.manager.trim(),
-      driver: staff.driver.trim(),
-      security: staff.security.trim()
+      manager: staff.manager.trim()
     }));
   } catch (err) {
     console.error('Error saving print staff:', err);

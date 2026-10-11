@@ -28,21 +28,11 @@
         <!-- Manager, Driver, Security, Date -->
         <div class="grid grid-cols-4 gap-2 text-xs border border-black p-2.5 rounded-lg bg-gray-50 mb-4">
           <div>
-            <span class="text-gray-600 block font-bold">مدير الأتوبيس:</span>
+            <span class="text-gray-600 block font-bold">قائد المأمورية :</span>
             <span class="font-bold text-black text-sm">{{ staffData.manager || '—' }}</span>
           </div>
-          <div>
-            <span class="text-gray-600 block font-bold">السائق:</span>
-            <span class="font-bold text-black text-sm">{{ staffData.driver || '—' }}</span>
-          </div>
-          <div>
-            <span class="text-gray-600 block font-bold">مسؤول الأمن:</span>
-            <span class="font-bold text-black text-sm">{{ staffData.security || '—' }}</span>
-          </div>
-          <div>
-            <span class="text-gray-600 block font-bold">تاريخ الطباعة:</span>
-            <span class="font-bold text-black text-xs">{{ printDate }}</span>
-          </div>
+
+      
         </div>
       </div>
 
@@ -71,15 +61,15 @@
                       🎓 الطالب: {{ student.name }}
                     </span>
                     <span class="text-xs font-mono text-gray-800">
-                      رقم عسكري: {{ student.military_number }} | إجمالي الأسرة: {{ student.persons_count }} فرد
+                      رقم عسكري: {{ student.military_number }} | الحاضرين بالأتوبيس: {{ student.persons_count }} فرد
                     </span>
                   </div>
                 </td>
               </tr>
 
-              <!-- FAMILY MEMBERS: Directly below, indented in normal lighter weight -->
+              <!-- FAMILY MEMBERS: Only members who attended appear in the bus printout! -->
               <tr
-                v-for="(member, mIdx) in (student.families || [])"
+                v-for="(member, mIdx) in (student.families || []).filter(m => m.attended)"
                 :key="member.id || mIdx"
                 class="border-b border-gray-300"
               >
@@ -100,11 +90,11 @@
                 </td>
               </tr>
 
-              <!-- If student came alone -->
-              <tr v-if="!student.families || student.families.length === 0" class="border-b border-gray-300">
+              <!-- If student came alone or no family members attended -->
+              <tr v-if="!student.families || student.families.filter(m => m.attended).length === 0" class="border-b border-gray-300">
                 <td class="border border-black p-1 text-center text-gray-400">—</td>
                 <td colspan="4" class="border border-black p-1.5 pr-6 text-gray-500 italic text-[11px]">
-                  (حضور فردي بدون مرافقين)
+                  (حضور فردي للطالب فقط بدون مرافقين حاضرين)
                 </td>
               </tr>
             </template>
@@ -139,21 +129,11 @@
           </div>
         </div>
 
-        <!-- 3 Signature Lines -->
-        <div class="grid grid-cols-3 gap-6 text-center text-xs pt-1">
-          <div class="border-t border-black pt-2">
-            <span class="font-bold block text-sm">مدير الأتوبيس</span>
+        <!-- Signature Line: قائد المأمورية -->
+        <div class="flex justify-center text-center text-xs pt-2">
+          <div class="border-t border-black pt-2 w-80">
+            <span class="font-bold block text-sm">قائد المأمورية</span>
             <span class="text-gray-700 text-xs block mb-4">({{ staffData.manager || '.......................' }})</span>
-            <span class="text-gray-400 block text-[10px]">التوقيع: ............................</span>
-          </div>
-          <div class="border-t border-black pt-2">
-            <span class="font-bold block text-sm">السائق</span>
-            <span class="text-gray-700 text-xs block mb-4">({{ staffData.driver || '.......................' }})</span>
-            <span class="text-gray-400 block text-[10px]">التوقيع: ............................</span>
-          </div>
-          <div class="border-t border-black pt-2">
-            <span class="font-bold block text-sm">مسؤول الأمن</span>
-            <span class="text-gray-700 text-xs block mb-4">({{ staffData.security || '.......................' }})</span>
             <span class="text-gray-400 block text-[10px]">التوقيع: ............................</span>
           </div>
         </div>
@@ -176,9 +156,7 @@ const props = defineProps({
   staff: {
     type: Object,
     default: () => ({
-      manager: '',
-      driver: '',
-      security: ''
+      manager: ''
     })
   }
 });
@@ -187,9 +165,7 @@ const store = useBusesStore();
 
 const staffData = computed(() => {
   return {
-    manager: props.staff?.manager || '',
-    driver: props.staff?.driver || '',
-    security: props.staff?.security || ''
+    manager: props.staff?.manager || ''
   };
 });
 

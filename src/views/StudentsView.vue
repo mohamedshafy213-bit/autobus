@@ -59,6 +59,17 @@
           title="تصدير قاعدة بيانات الطلاب والأسر وحالة التسكين بصيغة Excel"
           @click="handleExportExcel"
         />
+
+        <Button
+          label="حذف جميع الطلاب"
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          class="font-bold text-xs hover:!bg-red-50"
+          :disabled="store.isWriteDisabled || store.students.length === 0"
+          title="حذف جميع بيانات الطلاب والأسر بالكامل للبدء من جديد"
+          @click="confirmDeleteAllStudents"
+        />
       </div>
     </div>
 
@@ -632,6 +643,38 @@ function confirmDeleteStudent(student) {
           severity: 'error',
           summary: 'تعذر الحذف',
           detail: err.message || 'حدث خطأ في الحذف',
+          life: 4000
+        });
+      }
+    }
+  });
+}
+
+function confirmDeleteAllStudents() {
+  if (store.students.length === 0) return;
+
+  confirm.require({
+    message: `تحذير هام: هل أنت متأكد من رغبتك في حذف جميع الطلاب (${store.students.length} طالب) وبيانات أسرهم وتصفير المقاعد بالكامل؟ سيتم مسح كافة البيانات نهائياً للبدء من جديد.`,
+    header: 'تأكيد حذف جميع الطلاب والأسر',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'نعم، حذف الكل نهائياً',
+    rejectLabel: 'إلغاء التراجع',
+    acceptClass: 'p-button-danger !font-bold',
+    rejectClass: 'p-button-secondary !font-bold',
+    accept: async () => {
+      try {
+        await store.deleteAllStudents();
+        toast.add({
+          severity: 'success',
+          summary: 'تم حذف جميع البيانات',
+          detail: 'تم مسح وحذف كافة الطلاب والمرافقين بنجاح. يمكنك الآن رفع ملف البيانات الصحيح.',
+          life: 4000
+        });
+      } catch (err) {
+        toast.add({
+          severity: 'error',
+          summary: 'تعذر الحذف',
+          detail: err.message || 'حدث خطأ أثناء محاولة حذف البيانات',
           life: 4000
         });
       }

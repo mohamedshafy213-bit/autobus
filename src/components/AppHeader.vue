@@ -121,7 +121,24 @@
         </nav>
 
         <!-- Live Header Info & Server Connection Status -->
-        <div class="hidden md:flex items-center gap-4">
+        <div class="hidden lg:flex items-center gap-3">
+          
+          <!-- Device Distinction Badge (Server vs Client) -->
+          <div
+            v-if="store.deviceInfo"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs transition-all"
+            :class="store.deviceInfo.isServerDevice
+              ? 'bg-purple-950/90 text-purple-200 border border-purple-500/40 ring-1 ring-purple-500/20'
+              : 'bg-cyan-950/90 text-cyan-200 border border-cyan-500/40 ring-1 ring-cyan-500/20'"
+            :title="store.deviceInfo.isServerDevice ? 'هذا الجهاز هو السيرفر الرئيسي المستضيف للبيانات' : 'هذا الجهاز عميل متصل بالسيرفر عبر كابل الشبكة'"
+          >
+            <i :class="store.deviceInfo.isServerDevice ? 'pi pi-server text-purple-400' : 'pi pi-desktop text-cyan-400'"></i>
+            <span>{{ store.deviceInfo.isServerDevice ? 'السيرفر الرئيسي' : 'جهاز عميل (Client)' }}</span>
+            <span class="font-mono text-[11px] opacity-80 ms-1 px-1.5 py-0.2 rounded bg-black/30">
+              {{ store.deviceInfo.isServerDevice ? '130.117.53.42' : (store.deviceInfo.clientIp || 'جهاز عميل') }}
+            </span>
+          </div>
+
           <!-- Live Quick Numbers -->
           <div class="flex items-center gap-3 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
             <div>

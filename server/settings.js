@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   busCount: 28,
   defaultMaxFamilies: 8,
   defaultMaxPersons: 40,
+  autoSeating: false,
   overrides: {}
 };
 
@@ -25,6 +26,7 @@ export function getSettings() {
         busCount: Number(parsed.busCount) || DEFAULT_SETTINGS.busCount,
         defaultMaxFamilies: Number(parsed.defaultMaxFamilies) || DEFAULT_SETTINGS.defaultMaxFamilies,
         defaultMaxPersons: Number(parsed.defaultMaxPersons) || DEFAULT_SETTINGS.defaultMaxPersons,
+        autoSeating: Boolean(parsed.autoSeating),
         overrides: parsed.overrides && typeof parsed.overrides === 'object' ? parsed.overrides : {}
       };
     }
@@ -50,6 +52,7 @@ export function saveSettings(newSettings) {
     busCount: Math.max(1, Number(newSettings.busCount) || DEFAULT_SETTINGS.busCount),
     defaultMaxFamilies: Math.max(1, Number(newSettings.defaultMaxFamilies) || DEFAULT_SETTINGS.defaultMaxFamilies),
     defaultMaxPersons: Math.max(1, Number(newSettings.defaultMaxPersons) || DEFAULT_SETTINGS.defaultMaxPersons),
+    autoSeating: Boolean(newSettings.autoSeating),
     overrides: newSettings.overrides && typeof newSettings.overrides === 'object' ? newSettings.overrides : {}
   };
 

@@ -30,8 +30,14 @@ router.get('/state', handler((req, res) => {
 // 2) SEATING (CONFLICT PREVENTION)
 // ============================================================
 router.post('/seat', handler((req, res) => {
-  const { studentNumber, busNumber } = req.body;
-  const result = svc.seatStudent(studentNumber, busNumber);
+  const { studentNumber, busNumber, attendedMemberIds } = req.body;
+  const result = svc.seatStudent(studentNumber, busNumber, attendedMemberIds);
+  res.json(result);
+}));
+
+router.post('/auto-seat', handler((req, res) => {
+  const { studentNumber, attendedMemberIds } = req.body;
+  const result = svc.autoSeatStudent(studentNumber, attendedMemberIds);
   res.json(result);
 }));
 
@@ -42,8 +48,8 @@ router.post('/unseat', handler((req, res) => {
 }));
 
 router.post('/move', handler((req, res) => {
-  const { studentNumber, busNumber } = req.body;
-  const result = svc.moveStudent(studentNumber, busNumber);
+  const { studentNumber, busNumber, attendedMemberIds } = req.body;
+  const result = svc.moveStudent(studentNumber, busNumber, attendedMemberIds);
   res.json(result);
 }));
 
@@ -57,6 +63,21 @@ router.post('/students', handler((req, res) => {
 
 router.put('/students/:number', handler((req, res) => {
   const result = svc.updateStudent(req.params.number, req.body);
+  res.json(result);
+}));
+
+router.delete('/students', handler((req, res) => {
+  const result = svc.deleteAllStudents();
+  res.json(result);
+}));
+
+router.post('/students/delete-all', handler((req, res) => {
+  const result = svc.deleteAllStudents();
+  res.json(result);
+}));
+
+router.post('/delete-all-students', handler((req, res) => {
+  const result = svc.deleteAllStudents();
   res.json(result);
 }));
 
@@ -101,6 +122,21 @@ router.get('/export/backup', handler((req, res) => {
     return res.status(404).json({ code: 'NOT_FOUND', message: 'ملف قاعدة البيانات غير موجود' });
   }
   res.download(dbPath, `buses_backup_${new Date().toISOString().slice(0, 10)}.db`);
+}));
+
+// ============================================================
+// 6) SYSTEM / NETWORK DEVICE INFO
+// ============================================================
+router.get('/info', handler((req, res) => {
+  const rawClientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString();
+  const clientIp = rawClientIp.replace(/^.*:/, ''); // strip IPv6 prefix ::ffff:
+  const isLocal = clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '' || clientIp === '1';
+
+  res.json({
+    serverIp: '130.117.53.42',
+    clientIp: isLocal ? '127.0.0.1' : clientIp,
+    isServerDevice: isLocal || clientIp === '130.117.53.42'
+  });
 }));
 
 // ============================================================

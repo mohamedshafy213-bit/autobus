@@ -36,6 +36,43 @@
       </div>
     </div>
 
+    <!-- Automatic Seating (تسكين تلقائي) Toggle Card -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="form.autoSeating ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-100 text-slate-500'">
+            <i class="pi pi-bolt text-lg"></i>
+          </div>
+          <h3 class="text-base font-black text-slate-800">
+            تسكين تلقائي (Auto-Assign Bus)
+          </h3>
+          <Tag
+            :value="form.autoSeating ? 'مفعل ✓' : 'معطل (تسكين يدوي)'"
+            :severity="form.autoSeating ? 'success' : 'secondary'"
+            class="!text-xs !font-bold"
+          />
+        </div>
+        <p class="text-xs text-slate-500 font-semibold max-w-2xl">
+          عند تفعيل <strong>"تسكين تلقائي"</strong>: بمجرد تأكيد حضور أفراد الأسرة عند البوابة، يقوم النظام فوراً باختيار أول أتوبيس به مقاعد شاغرة وتسجيلهم فيه تلقائياً دون الحاجة لاختيار الأتوبيس يدوياً.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <Button
+          :label="form.autoSeating ? 'التسكين التلقائي (مفعل ✓)' : 'تفعيل التسكين التلقائي'"
+          :icon="form.autoSeating ? 'pi pi-check-circle' : 'pi pi-bolt'"
+          :class="[
+            'font-bold text-xs !py-3 !px-5 transition-all shadow-sm',
+            form.autoSeating 
+              ? '!bg-emerald-600 !border-emerald-600 !text-white hover:!bg-emerald-700' 
+              : '!bg-amber-600 !border-amber-600 !text-white hover:!bg-amber-700'
+          ]"
+          :disabled="store.isWriteDisabled || saving"
+          @click="toggleAutoSeating"
+        />
+      </div>
+    </div>
+
     <!-- General Settings Form -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
       <h3 class="text-base font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -250,6 +287,7 @@ const form = reactive({
   busCount: 28,
   defaultMaxFamilies: 8,
   defaultMaxPersons: 40,
+  autoSeating: false,
   overrides: {}
 });
 
@@ -259,6 +297,7 @@ function populateFormFromStore() {
   form.busCount = store.settings.busCount || 28;
   form.defaultMaxFamilies = store.settings.defaultMaxFamilies || 8;
   form.defaultMaxPersons = store.settings.defaultMaxPersons || 40;
+  form.autoSeating = !!store.settings.autoSeating;
   form.overrides = { ...(store.settings.overrides || {}) };
 
   buildBusTableData();
@@ -313,6 +352,11 @@ function clearAllOverrides() {
   buildBusTableData();
 }
 
+async function toggleAutoSeating() {
+  form.autoSeating = !form.autoSeating;
+  await saveSettings();
+}
+
 async function saveSettings() {
   saving.value = true;
   try {
@@ -331,6 +375,7 @@ async function saveSettings() {
       busCount: Number(form.busCount),
       defaultMaxFamilies: Number(form.defaultMaxFamilies),
       defaultMaxPersons: Number(form.defaultMaxPersons),
+      autoSeating: Boolean(form.autoSeating),
       overrides: cleanOverrides
     });
 

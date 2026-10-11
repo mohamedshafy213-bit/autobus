@@ -70,7 +70,7 @@ export function getFullState() {
   }));
 
   const lastPrintStaffRaw = stmts.getSetting.get('lastPrintStaff');
-  const lastPrintStaff = lastPrintStaffRaw ? JSON.parse(lastPrintStaffRaw.value) : { manager: '', driver: '', security: '' };
+  const lastPrintStaff = lastPrintStaffRaw ? JSON.parse(lastPrintStaffRaw.value) : { manager: '' };
 
   return { students, familyMembers, assignedFamilies, buses, lastPrintStaff };
 }

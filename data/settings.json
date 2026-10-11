@@ -2,10 +2,11 @@
   "busCount": 28,
   "defaultMaxFamilies": 8,
   "defaultMaxPersons": 40,
+  "autoSeating": false,
   "overrides": {
-    "2": {
-      "maxFamilies": 3,
-      "maxPersons": 15
+    "28": {
+      "maxFamilies": 1,
+      "maxPersons": 10
     }
   }
 }

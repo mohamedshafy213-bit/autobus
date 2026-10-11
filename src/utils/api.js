@@ -47,10 +47,17 @@ export async function fetchState() {
   return request('/api/state');
 }
 
-export async function apiSeat(studentNumber, busNumber) {
+export async function apiSeat(studentNumber, busNumber, attendedMemberIds) {
   return request('/api/seat', {
     method: 'POST',
-    body: JSON.stringify({ studentNumber, busNumber })
+    body: JSON.stringify({ studentNumber, busNumber, attendedMemberIds })
+  });
+}
+
+export async function apiAutoSeat(studentNumber, attendedMemberIds) {
+  return request('/api/auto-seat', {
+    method: 'POST',
+    body: JSON.stringify({ studentNumber, attendedMemberIds })
   });
 }
 
@@ -61,10 +68,10 @@ export async function apiUnseat(studentNumber) {
   });
 }
 
-export async function apiMove(studentNumber, busNumber) {
+export async function apiMove(studentNumber, busNumber, attendedMemberIds) {
   return request('/api/move', {
     method: 'POST',
-    body: JSON.stringify({ studentNumber, busNumber })
+    body: JSON.stringify({ studentNumber, busNumber, attendedMemberIds })
   });
 }
 
@@ -87,6 +94,17 @@ export async function apiDeleteStudent(militaryNumber, force = false) {
   return request(`/api/students/${encodeURIComponent(militaryNumber)}${q}`, {
     method: 'DELETE'
   });
+}
+
+export async function apiDeleteAllStudents() {
+  try {
+    return await request('/api/students', { method: 'DELETE' });
+  } catch (err) {
+    if (err.status === 404) {
+      return await request('/api/students/delete-all', { method: 'POST' });
+    }
+    throw err;
+  }
 }
 
 export async function apiGetSettings() {
@@ -113,16 +131,23 @@ export async function apiResetSeating() {
   });
 }
 
+export async function apiGetDeviceInfo() {
+  return request('/api/info');
+}
+
 export default {
   fetchState,
   apiSeat,
+  apiAutoSeat,
   apiUnseat,
   apiMove,
   apiAddStudent,
   apiUpdateStudent,
   apiDeleteStudent,
+  apiDeleteAllStudents,
   apiGetSettings,
   apiUpdateSettings,
   apiImportStudents,
-  apiResetSeating
+  apiResetSeating,
+  apiGetDeviceInfo
 };

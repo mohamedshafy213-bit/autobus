@@ -1,21 +1,42 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const http = require('http');
 
 let mainWindow = null;
 let serverProcess = null;
 const PORT = process.env.PORT || 3000;
 
-function startBackendServer() {
-  const serverScript = path.join(__dirname, '..', 'server', 'index.js');
-  serverProcess = spawn('node', [serverScript], {
-    cwd: path.join(__dirname, '..'),
-    env: { ...process.env, PORT: String(PORT) },
-    stdio: 'inherit'
+function checkServerReady(cb) {
+  const req = http.get(`http://127.0.0.1:${PORT}/api/state`, (res) => {
+    cb(res.statusCode < 500);
   });
+  req.on('error', () => {
+    cb(false);
+  });
+  req.setTimeout(800, () => {
+    req.destroy();
+    cb(false);
+  });
+}
 
-  serverProcess.on('error', (err) => {
-    console.error('Failed to start Express backend:', err);
+function startBackendServer() {
+  checkServerReady((isReady) => {
+    if (isReady) {
+      console.log('Server is already running on port', PORT);
+      return;
+    }
+    const serverScript = path.join(__dirname, '..', 'server', 'index.js');
+    serverProcess = spawn('node', [serverScript], {
+      cwd: path.join(__dirname, '..'),
+      env: { ...process.env, PORT: String(PORT) },
+      shell: true,
+      stdio: 'inherit'
+    });
+
+    serverProcess.on('error', (err) => {
+      console.error('Failed to start Express backend:', err);
+    });
   });
 }
 
@@ -23,11 +44,11 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1100,
+    minWidth: 1024,
     minHeight: 700,
     title: 'منظومة الأتوبيسات — حفل التخرج',
     autoHideMenuBar: true,
-    show: false, // Show when ready to prevent blank flash
+    show: true,
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: false,
@@ -35,23 +56,21 @@ function createWindow() {
     }
   });
 
-  // Wait a short moment for Express to initialize, then load
   const targetUrl = `http://localhost:${PORT}`;
 
-  const tryLoad = (retries = 15) => {
-    mainWindow.loadURL(targetUrl).catch(() => {
-      if (retries > 0) {
-        setTimeout(() => tryLoad(retries - 1), 500);
+  const pollAndLoad = (retries = 30) => {
+    checkServerReady((ready) => {
+      if (ready) {
+        mainWindow.loadURL(targetUrl);
+      } else if (retries > 0) {
+        setTimeout(() => pollAndLoad(retries - 1), 300);
+      } else {
+        mainWindow.loadURL(targetUrl);
       }
     });
   };
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    mainWindow.focus();
-  });
-
-  tryLoad();
+  pollAndLoad();
 
   mainWindow.on('closed', () => {
     mainWindow = null;

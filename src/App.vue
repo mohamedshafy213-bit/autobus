@@ -49,9 +49,7 @@ const store = useBusesStore();
 const printState = reactive({
   targetBusNumber: null,
   staff: {
-    manager: '',
-    driver: '',
-    security: ''
+    manager: ''
   }
 });
 
