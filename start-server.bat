@@ -1,36 +1,27 @@
 @echo off
-chcp 65001 > nul
+setlocal
+chcp 65001 >nul
 cd /d "%~dp0"
-title منظومة الأتوبيسات — السيرفر الرئيسي (Server)
+title Buses System - Main Server
 
 echo ======================================================================
-echo                 منظومة الأتوبيسات لحفل التخرج
-echo                  السيرفر الرئيسي (Main Server)
+echo                     BUSES SYSTEM - MAIN SERVER
+echo                          PORT: 3000
 echo ======================================================================
 echo.
 
-:: 1. إغلاق أي عملية سابقة على المنفذ 3000
-echo [1/3] فحص المنفذ 3000 وإغلاق أي خادم سابق...
+REM 1. Close any previous process listening on port 3000
+echo [1/3] Checking port 3000 and closing any running server...
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING') do (
-    taskkill /F /PID %%a >nul 2>nul
+    taskkill /F /PID %%a >nul 2>&1
 )
 
-:: 2. إطلاق المتصفح بعد ثانيتين للمستخدم المحلي على السيرفر
-echo [2/3] تجهيز نافذة المنظومة...
-set "LOCAL_URL=http://localhost:3000"
+REM 2. Launch browser window in app mode after 2 seconds
+echo [2/3] Opening application window...
+start "" powershell -WindowStyle Hidden -Command "$url='http://localhost:3000'; Start-Sleep -Seconds 2; if (Get-Command msedge.exe -ErrorAction SilentlyContinue) { Start-Process msedge.exe -ArgumentList \"--app=$url\" } elseif (Get-Command chrome.exe -ErrorAction SilentlyContinue) { Start-Process chrome.exe -ArgumentList \"--app=$url\" } else { Start-Process $url }"
 
-set "BROWSER="
-if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" set "BROWSER=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
-if "%BROWSER%"=="" if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "BROWSER=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
-if "%BROWSER%"=="" if exist "%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe" set "BROWSER=%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"
-if "%BROWSER%"=="" if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "BROWSER=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-if "%BROWSER%"=="" if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "BROWSER=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-if "%BROWSER%"=="" if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" set "BROWSER=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
-
-start "" powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 2; $url='%LOCAL_URL%'; if (Test-Path '%BROWSER%') { Start-Process '%BROWSER%' -ArgumentList \"--app=$url\" } else { Start-Process $url }"
-
-:: 3. تشغيل السيرفر
-echo [3/3] جاري تشغيل السيرفر على المنفذ 3000...
+REM 3. Start Node.js server
+echo [3/3] Starting server on port 3000...
 echo.
 node server/index.js
 
