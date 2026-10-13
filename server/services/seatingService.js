@@ -608,8 +608,78 @@ export const deleteAllStudents = db.transaction(() => {
   return { success: true };
 }).immediate;
 
+// ============================================================
+// REPLICATION SNAPSHOT (PRIMARY <-> BACKUP SYNC)
+// ============================================================
+
+export function getReplicationSnapshot() {
+  const students = stmts.getAllStudents.all();
+  const families = stmts.getAllFamilies.all();
+  const buses = stmts.getAllBusSeats.all();
+  const settings = getSettings();
+  return {
+    version: Date.now(),
+    timestamp: new Date().toISOString(),
+    students,
+    families,
+    buses,
+    settings
+  };
+}
+
+export const applyReplicationSnapshot = db.transaction((snapshot) => {
+  if (!snapshot || !Array.isArray(snapshot.students)) {
+    throw new Error('بيانات المزامنة غير صالحة');
+  }
+
+  // 1. Wipe existing data atomically
+  stmts.deleteAllBusSeats.run();
+  db.prepare('DELETE FROM families').run();
+  db.prepare('DELETE FROM students').run();
+
+  // 2. Insert students
+  const insertStd = db.prepare('INSERT INTO students (military_number, name) VALUES (?, ?)');
+  for (const s of snapshot.students) {
+    insertStd.run(s.military_number, s.name);
+  }
+
+  // 3. Insert families
+  const insertFam = db.prepare('INSERT INTO families (id, student_number, name, national_id, relation, attended) VALUES (?, ?, ?, ?, ?, ?)');
+  for (const f of snapshot.families || []) {
+    insertFam.run(
+      f.id !== undefined && f.id !== null ? Number(f.id) : null,
+      f.student_number,
+      f.name,
+      f.national_id || '',
+      f.relation || '',
+      f.attended === 0 ? 0 : 1
+    );
+  }
+
+  // 4. Insert bus seats
+  const insertSeat = db.prepare('INSERT INTO buses (bus_number, student_number, seated_at) VALUES (?, ?, ?)');
+  for (const b of snapshot.buses || []) {
+    insertSeat.run(Number(b.bus_number), b.student_number, b.seated_at || new Date().toISOString());
+  }
+
+  // 5. Update settings if included
+  if (snapshot.settings && typeof snapshot.settings === 'object') {
+    saveSettings(snapshot.settings);
+  }
+
+  return {
+    success: true,
+    studentsCount: snapshot.students.length,
+    familiesCount: (snapshot.families || []).length,
+    seatedCount: (snapshot.buses || []).length,
+    timestamp: new Date().toISOString()
+  };
+}).immediate;
+
 export default {
   getState,
+  getReplicationSnapshot,
+  applyReplicationSnapshot,
   seatStudent,
   autoSeatStudent,
   unseatStudent,

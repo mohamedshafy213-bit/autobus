@@ -26,6 +26,17 @@ export const useBusesStore = defineStore('buses', {
       serverIp: '130.117.53.42',
       clientIp: '',
       isServerDevice: true
+    },
+    failover: {
+      activeServer: 'primary', // 'primary' | 'backup'
+      primaryUrl: '',
+      backupUrl: '',
+      primaryOnline: true,
+      backupOnline: false,
+      lastFailoverEvent: null,
+      lastSyncTime: null,
+      lastSyncStatus: 'idle', // 'idle' | 'success' | 'error'
+      lastSyncError: null
     }
   }),
 
@@ -125,7 +136,25 @@ export const useBusesStore = defineStore('buses', {
       if (this.isInitialized) return;
       this.isInitialized = true;
 
+      // Initialize failover configuration
+      const sCfg = api.getServerConfig();
+      this.failover.primaryUrl = sCfg.primaryServerUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+      this.failover.backupUrl = sCfg.backupServerUrl || '';
+      this.failover.activeServer = sCfg.activeServer;
+
+      api.onFailover((event) => {
+        this.failover.activeServer = event.switchedTo;
+        this.failover.lastFailoverEvent = event;
+        console.warn('Failover event detected in store:', event);
+      });
+
       await this.refreshState();
+
+      // If settings had a backupServerUrl, sync it
+      if (this.settings.backupServerUrl && !this.failover.backupUrl) {
+        this.failover.backupUrl = this.settings.backupServerUrl;
+        api.setServerConfig({ backupUrl: this.settings.backupServerUrl });
+      }
 
       try {
         const info = await api.apiGetDeviceInfo();
@@ -134,10 +163,19 @@ export const useBusesStore = defineStore('buses', {
         // ignore
       }
 
+      // Check initial replication status
+      this.checkReplicationHealth();
+
       // Poll every 3 seconds
       if (this.pollTimer) clearInterval(this.pollTimer);
+      let pollCounter = 0;
       this.pollTimer = setInterval(() => {
         this.refreshState(true);
+        pollCounter++;
+        // Check backup server health every ~6 seconds
+        if (pollCounter % 2 === 0) {
+          this.checkReplicationHealth();
+        }
       }, 3000);
     },
 
@@ -150,12 +188,58 @@ export const useBusesStore = defineStore('buses', {
         this.settings = data.settings || this.settings;
         this.isOnline = true;
         this.lastPollError = null;
+        if (this.failover.activeServer === 'primary') {
+          this.failover.primaryOnline = true;
+        } else {
+          this.failover.backupOnline = true;
+        }
       } catch (err) {
         this.isOnline = false;
         this.lastPollError = err.message || 'انقطع الاتصال بالسيرفر';
+        if (this.failover.activeServer === 'primary') {
+          this.failover.primaryOnline = false;
+        } else {
+          this.failover.backupOnline = false;
+        }
         if (!isBackground) {
           throw err;
         }
+      }
+    },
+
+    // Check replication health and ping the other server
+    async checkReplicationHealth() {
+      try {
+        const repStatus = await api.apiGetReplicationStatus();
+        if (repStatus) {
+          this.failover.lastSyncTime = repStatus.lastSyncTime;
+          this.failover.lastSyncStatus = repStatus.lastSyncStatus;
+          this.failover.lastSyncError = repStatus.lastSyncError;
+          if (repStatus.backupServerUrl && !this.failover.backupUrl) {
+            this.failover.backupUrl = repStatus.backupServerUrl;
+            api.setServerConfig({ backupUrl: repStatus.backupServerUrl });
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // Ping backup server if configured and we are currently on primary
+      if (this.failover.backupUrl) {
+        api.apiPingServer(this.failover.backupUrl).then(res => {
+          this.failover.backupOnline = res.ok;
+        }).catch(() => {
+          this.failover.backupOnline = false;
+        });
+      }
+
+      // Ping primary server if we failed over to backup
+      if (this.failover.activeServer === 'backup' && this.failover.primaryUrl) {
+        api.apiPingServer(this.failover.primaryUrl).then(res => {
+          this.failover.primaryOnline = res.ok;
+        }).catch(() => {
+          this.failover.primaryOnline = false;
+        });
       }
     },
 
@@ -300,6 +384,48 @@ export const useBusesStore = defineStore('buses', {
         const report = await api.apiImportStudents(studentsList, mode);
         await this.refreshState();
         return report;
+      } finally {
+        this.actionLoading = false;
+      }
+    },
+
+    // Switch between Primary and Backup Server
+    async switchActiveServer(target) {
+      if (target !== 'primary' && target !== 'backup') return;
+      api.setServerConfig({ active: target });
+      this.failover.activeServer = target;
+      await this.refreshState();
+    },
+
+    // Set and persist backup server URL
+    async setBackupServerUrl(url) {
+      const clean = (url || '').trim().replace(/\/$/, '');
+      this.failover.backupUrl = clean;
+      api.setServerConfig({ backupUrl: clean });
+      await this.updateSettings({ ...this.settings, backupServerUrl: clean });
+      await this.checkReplicationHealth();
+    },
+
+    // Push live database snapshot to backup server now
+    async syncNowToBackup() {
+      this.actionLoading = true;
+      try {
+        const result = await api.apiTriggerSyncNow(this.failover.backupUrl);
+        await this.checkReplicationHealth();
+        return result;
+      } finally {
+        this.actionLoading = false;
+      }
+    },
+
+    // Pull database snapshot from primary server now
+    async pullNowFromPrimary() {
+      this.actionLoading = true;
+      try {
+        const result = await api.apiTriggerPullNow(this.failover.primaryUrl);
+        await this.refreshState();
+        await this.checkReplicationHealth();
+        return result;
       } finally {
         this.actionLoading = false;
       }

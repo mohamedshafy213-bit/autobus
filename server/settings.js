@@ -7,10 +7,12 @@ const __dirname = path.dirname(__filename);
 const settingsFile = path.join(__dirname, '..', 'data', 'settings.json');
 
 const DEFAULT_SETTINGS = {
-  busCount: 28,
-  defaultMaxFamilies: 8,
-  defaultMaxPersons: 40,
+  busCount: 27,
+  defaultMaxFamilies: 9,
+  defaultMaxPersons: 50,
   autoSeating: false,
+  backupServerUrl: '',
+  autoReplicate: true,
   overrides: {}
 };
 
@@ -27,6 +29,8 @@ export function getSettings() {
         defaultMaxFamilies: Number(parsed.defaultMaxFamilies) || DEFAULT_SETTINGS.defaultMaxFamilies,
         defaultMaxPersons: Number(parsed.defaultMaxPersons) || DEFAULT_SETTINGS.defaultMaxPersons,
         autoSeating: Boolean(parsed.autoSeating),
+        backupServerUrl: String(parsed.backupServerUrl || '').trim(),
+        autoReplicate: parsed.autoReplicate !== undefined ? Boolean(parsed.autoReplicate) : true,
         overrides: parsed.overrides && typeof parsed.overrides === 'object' ? parsed.overrides : {}
       };
     }
@@ -53,6 +57,8 @@ export function saveSettings(newSettings) {
     defaultMaxFamilies: Math.max(1, Number(newSettings.defaultMaxFamilies) || DEFAULT_SETTINGS.defaultMaxFamilies),
     defaultMaxPersons: Math.max(1, Number(newSettings.defaultMaxPersons) || DEFAULT_SETTINGS.defaultMaxPersons),
     autoSeating: Boolean(newSettings.autoSeating),
+    backupServerUrl: String(newSettings.backupServerUrl !== undefined ? newSettings.backupServerUrl : (getSettings().backupServerUrl || '')).trim(),
+    autoReplicate: newSettings.autoReplicate !== undefined ? Boolean(newSettings.autoReplicate) : true,
     overrides: newSettings.overrides && typeof newSettings.overrides === 'object' ? newSettings.overrides : {}
   };
 
