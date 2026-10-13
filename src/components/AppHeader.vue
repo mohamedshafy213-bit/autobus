@@ -135,7 +135,7 @@
             <i :class="store.deviceInfo.isServerDevice ? 'pi pi-server text-purple-400' : 'pi pi-desktop text-cyan-400'"></i>
             <span>{{ store.deviceInfo.isServerDevice ? 'السيرفر الرئيسي' : 'جهاز عميل (Client)' }}</span>
             <span class="font-mono text-[11px] opacity-80 ms-1 px-1.5 py-0.2 rounded bg-black/30">
-              {{ store.deviceInfo.isServerDevice ? '130.117.53.42' : (store.deviceInfo.clientIp || 'جهاز عميل') }}
+              {{ store.deviceInfo.isServerDevice ? 'SERVER' : (store.deviceInfo.clientIp || 'جهاز عميل') }}
             </span>
           </div>
 
