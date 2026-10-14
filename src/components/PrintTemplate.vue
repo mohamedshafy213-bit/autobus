@@ -403,10 +403,10 @@ const printBusPages = computed(() => {
     line-height: 1.15;
   }
 
-  /* Black color for empty rows so they are immediately differentiated */
+  /* grey color for empty rows so they are immediately different from filled rows */
   .empty-member-row td {
-    background-color: #000000 !important;
-    border: 1px solid #000000 !important;
+    background-color: #e0dbdb !important;
+    border: 1px solid #c3c1c1 !important;
     color: transparent !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
