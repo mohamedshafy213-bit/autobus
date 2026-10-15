@@ -24,13 +24,46 @@ const stmts = {
     SELECT COUNT(*) as cnt 
     FROM families 
     WHERE student_number IN (SELECT student_number FROM buses WHERE bus_number = ?)
+      AND attended = 1
   `),
   insertBusSeat: db.prepare('INSERT INTO buses (bus_number, student_number, seated_at) VALUES (?, ?, ?)'),
   updateBusSeat: db.prepare('UPDATE buses SET bus_number = ?, seated_at = ? WHERE student_number = ?'),
   deleteBusSeat: db.prepare('DELETE FROM buses WHERE student_number = ?'),
   deleteAllBusSeats: db.prepare('DELETE FROM buses'),
-  getMaxSeatedBus: db.prepare('SELECT MAX(bus_number) as maxBus FROM buses')
+  getMaxSeatedBus: db.prepare('SELECT MAX(bus_number) as maxBus FROM buses'),
+
+  setAllFamiliesAttendedByStudent: db.prepare('UPDATE families SET attended = 1 WHERE student_number = ?'),
+  resetFamiliesAttendedByStudent: db.prepare('UPDATE families SET attended = 0 WHERE student_number = ?'),
+  setFamilyAttendedById: db.prepare('UPDATE families SET attended = ? WHERE id = ? AND student_number = ?')
 };
+
+/**
+ * Update attendance for a student's family members
+ */
+function updateStudentFamilyAttendance(stdNum, attendedMemberIds) {
+  if (Array.isArray(attendedMemberIds)) {
+    stmts.resetFamiliesAttendedByStudent.run(stdNum);
+    for (const memId of attendedMemberIds) {
+      stmts.setFamilyAttendedById.run(1, Number(memId), stdNum);
+    }
+  } else {
+    stmts.setAllFamiliesAttendedByStudent.run(stdNum);
+  }
+}
+
+/**
+ * Get attending persons count for a specific student family (1 student + attended members)
+ */
+function getAttendingPersonsCount(stdNum, attendedMemberIds) {
+  if (Array.isArray(attendedMemberIds)) {
+    const family = stmts.getFamiliesByStudent.all(stdNum);
+    const validIds = new Set(family.map(f => Number(f.id)));
+    const matched = attendedMemberIds.filter(id => validIds.has(Number(id)));
+    return 1 + matched.length;
+  }
+  const members = stmts.countFamiliesByStudent.get(stdNum)?.cnt || 0;
+  return 1 + members;
+}
 
 /**
  * Get current capacity counts for a bus inside a transaction
@@ -38,7 +71,7 @@ const stmts = {
 function getBusCountsInsideTx(busNumber) {
   const familiesCount = stmts.countFamiliesInBus.get(busNumber)?.cnt || 0;
   const membersCount = stmts.countMembersInBus.get(busNumber)?.cnt || 0;
-  // Total persons = 1 student per family + total family members
+  // Total persons = 1 student per family + attended family members
   const personsCount = familiesCount + membersCount;
   return { familiesCount, personsCount };
 }
@@ -71,7 +104,8 @@ export function getState() {
       student_number: f.student_number,
       name: f.name,
       national_id: f.national_id || '',
-      relation: f.relation || ''
+      relation: f.relation || '',
+      attended: f.attended === 1
     });
   }
 
@@ -85,13 +119,19 @@ export function getState() {
   const students = allStudents.map(student => {
     const mems = familiesByStudent.get(student.military_number) || [];
     const seat = seatByStudent.get(student.military_number);
+    const attendedMemsCount = mems.filter(m => m.attended).length;
+    // When seated: persons_count is 1 (student) + attended members.
+    // When not seated: persons_count is 1 + all registered members.
+    const persons_count = seat ? (1 + attendedMemsCount) : (1 + mems.length);
     return {
       military_number: student.military_number,
       name: student.name,
       families: mems,
       bus_number: seat ? seat.bus_number : null,
       seated_at: seat ? seat.seated_at : null,
-      persons_count: 1 + mems.length
+      persons_count,
+      total_registered_persons: 1 + mems.length,
+      attended_members_count: attendedMemsCount
     };
   });
 
@@ -133,7 +173,7 @@ export function getState() {
 /**
  * Seat a student's family in a bus with conflict prevention
  */
-export const seatStudent = db.transaction((studentNumber, busNumber) => {
+export const seatStudent = db.transaction((studentNumber, busNumber, attendedMemberIds) => {
   const stdNum = String(studentNumber || '').trim();
   const busNum = Number(busNumber);
 
@@ -168,7 +208,7 @@ export const seatStudent = db.transaction((studentNumber, busNumber) => {
   // 4. Capacity validation inside transaction
   const limits = getBusLimits(busNum, settings);
   const currentCounts = getBusCountsInsideTx(busNum);
-  const thisFamilyPersons = getStudentPersonsCount(stdNum);
+  const thisFamilyPersons = getAttendingPersonsCount(stdNum, attendedMemberIds);
 
   if (currentCounts.familiesCount + 1 > limits.maxFamilies) {
     const err = new Error(`الأتوبيس رقم ${busNum} لم يعد يتسع (اكتمل عدد العائلات)، اختر أتوبيساً آخر`);
@@ -192,11 +232,72 @@ export const seatStudent = db.transaction((studentNumber, busNumber) => {
   const seatedAt = new Date().toISOString();
   stmts.insertBusSeat.run(busNum, stdNum, seatedAt);
 
+  // 6. Update family member attendance
+  updateStudentFamilyAttendance(stdNum, attendedMemberIds);
+
   return {
     success: true,
     studentNumber: stdNum,
     busNumber: busNum,
-    seated_at: seatedAt
+    seated_at: seatedAt,
+    attendingPersons: thisFamilyPersons
+  };
+}).immediate;
+
+/**
+ * Auto-seat a student into the first available bus with enough capacity
+ */
+export const autoSeatStudent = db.transaction((studentNumber, attendedMemberIds) => {
+  const stdNum = String(studentNumber || '').trim();
+  const student = stmts.getStudent.get(stdNum);
+  if (!student) {
+    const err = new Error('الطالب غير مسجل بالمنظومة');
+    err.code = 'STUDENT_NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+
+  const existingSeat = stmts.getBusSeatByStudent.get(stdNum);
+  if (existingSeat) {
+    const err = new Error(`هذه العائلة مسجلة بالفعل في أتوبيس رقم ${existingSeat.bus_number}`);
+    err.code = 'ALREADY_SEATED';
+    err.status = 409;
+    err.busNumber = existingSeat.bus_number;
+    throw err;
+  }
+
+  const settings = getSettings();
+  const thisFamilyPersons = getAttendingPersonsCount(stdNum, attendedMemberIds);
+
+  let assignedBus = null;
+  for (let b = 1; b <= settings.busCount; b++) {
+    const limits = getBusLimits(b, settings);
+    const counts = getBusCountsInsideTx(b);
+    if (counts.familiesCount + 1 <= limits.maxFamilies && counts.personsCount + thisFamilyPersons <= limits.maxPersons) {
+      assignedBus = b;
+      break;
+    }
+  }
+
+  if (!assignedBus) {
+    const err = new Error(`جميع الأتوبيسات ممتلئة ولا تتسع لعدد أفراد هذه العائلة (${thisFamilyPersons} فرد)`);
+    err.code = 'ALL_BUSES_FULL';
+    err.status = 409;
+    throw err;
+  }
+
+  const seatedAt = new Date().toISOString();
+  stmts.insertBusSeat.run(assignedBus, stdNum, seatedAt);
+
+  updateStudentFamilyAttendance(stdNum, attendedMemberIds);
+
+  return {
+    success: true,
+    studentNumber: stdNum,
+    busNumber: assignedBus,
+    seated_at: seatedAt,
+    autoSeated: true,
+    attendingPersons: thisFamilyPersons
   };
 }).immediate;
 
@@ -214,13 +315,14 @@ export const unseatStudent = db.transaction((studentNumber) => {
   }
 
   stmts.deleteBusSeat.run(stdNum);
+  stmts.setAllFamiliesAttendedByStudent.run(stdNum);
   return { success: true, studentNumber: stdNum };
 }).immediate;
 
 /**
  * Move a student to another bus with capacity validation
  */
-export const moveStudent = db.transaction((studentNumber, targetBusNumber) => {
+export const moveStudent = db.transaction((studentNumber, targetBusNumber, attendedMemberIds) => {
   const stdNum = String(studentNumber || '').trim();
   const targetBus = Number(targetBusNumber);
 
@@ -240,6 +342,7 @@ export const moveStudent = db.transaction((studentNumber, targetBusNumber) => {
     throw err;
   }
 
+  const currentBus = existingSeat.bus_number;
   const settings = getSettings();
   if (!targetBus || targetBus < 1 || targetBus > settings.busCount) {
     const err = new Error('رقم الأتوبيس غير صالح');
@@ -248,42 +351,45 @@ export const moveStudent = db.transaction((studentNumber, targetBusNumber) => {
     throw err;
   }
 
-  // If already in target bus, no-op
-  if (existingSeat.bus_number === targetBus) {
-    return { success: true, busNumber: targetBus, studentNumber: stdNum };
+  // Update attendance if provided
+  if (attendedMemberIds !== undefined) {
+    updateStudentFamilyAttendance(stdNum, attendedMemberIds);
   }
 
-  // Check capacity of target bus
-  const limits = getBusLimits(targetBus, settings);
-  const currentCounts = getBusCountsInsideTx(targetBus);
-  const thisFamilyPersons = getStudentPersonsCount(stdNum);
+  const thisFamilyPersons = getAttendingPersonsCount(stdNum, attendedMemberIds);
 
-  if (currentCounts.familiesCount + 1 > limits.maxFamilies) {
-    const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع (اكتمل عدد العائلات)، اختر أتوبيساً آخر`);
-    err.code = 'BUS_FULL';
-    err.status = 409;
-    err.busNumber = targetBus;
-    err.reason = 'FAMILIES';
-    throw err;
+  // If targetBus is different from currentBus, check capacity
+  if (targetBus !== currentBus) {
+    const limits = getBusLimits(targetBus, settings);
+    const counts = getBusCountsInsideTx(targetBus);
+
+    if (counts.familiesCount + 1 > limits.maxFamilies) {
+      const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع (اكتمل عدد العائلات)، اختر أتوبيساً آخر`);
+      err.code = 'BUS_FULL';
+      err.status = 409;
+      err.busNumber = targetBus;
+      throw err;
+    }
+
+    if (counts.personsCount + thisFamilyPersons > limits.maxPersons) {
+      const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع لعدد أفراد هذه العائلة (${thisFamilyPersons} فرد)، اختر أتوبيساً آخر`);
+      err.code = 'BUS_FULL';
+      err.status = 409;
+      err.busNumber = targetBus;
+      throw err;
+    }
+
+    const seatedAt = new Date().toISOString();
+    stmts.updateBusSeat.run(targetBus, seatedAt, stdNum);
   }
-
-  if (currentCounts.personsCount + thisFamilyPersons > limits.maxPersons) {
-    const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع لعدد أفراد هذه العائلة (${thisFamilyPersons} فرد)، اختر أتوبيساً آخر`);
-    err.code = 'BUS_FULL';
-    err.status = 409;
-    err.busNumber = targetBus;
-    err.reason = 'PERSONS';
-    throw err;
-  }
-
-  const seatedAt = new Date().toISOString();
-  stmts.updateBusSeat.run(targetBus, seatedAt, stdNum);
 
   return {
     success: true,
     studentNumber: stdNum,
     busNumber: targetBus,
-    seated_at: seatedAt
+    previousBus: currentBus,
+    seated_at: new Date().toISOString(),
+    attendingPersons: thisFamilyPersons
   };
 }).immediate;
 
@@ -431,6 +537,7 @@ export function updateSettings(newSettings) {
 
 export const resetSeating = db.transaction(() => {
   stmts.deleteAllBusSeats.run();
+  db.prepare('UPDATE families SET attended = 1').run();
   return { success: true };
 }).immediate;
 
@@ -494,14 +601,93 @@ export const importStudents = db.transaction((studentsList, mode = 'skip') => {
   return { inserted, updated, skipped, errors };
 }).immediate;
 
+export const deleteAllStudents = db.transaction(() => {
+  stmts.deleteAllBusSeats.run();
+  db.prepare('DELETE FROM families').run();
+  db.prepare('DELETE FROM students').run();
+  return { success: true };
+}).immediate;
+
+// ============================================================
+// REPLICATION SNAPSHOT (PRIMARY <-> BACKUP SYNC)
+// ============================================================
+
+export function getReplicationSnapshot() {
+  const students = stmts.getAllStudents.all();
+  const families = stmts.getAllFamilies.all();
+  const buses = stmts.getAllBusSeats.all();
+  const settings = getSettings();
+  return {
+    version: Date.now(),
+    timestamp: new Date().toISOString(),
+    students,
+    families,
+    buses,
+    settings
+  };
+}
+
+export const applyReplicationSnapshot = db.transaction((snapshot) => {
+  if (!snapshot || !Array.isArray(snapshot.students)) {
+    throw new Error('بيانات المزامنة غير صالحة');
+  }
+
+  // 1. Wipe existing data atomically
+  stmts.deleteAllBusSeats.run();
+  db.prepare('DELETE FROM families').run();
+  db.prepare('DELETE FROM students').run();
+
+  // 2. Insert students
+  const insertStd = db.prepare('INSERT INTO students (military_number, name) VALUES (?, ?)');
+  for (const s of snapshot.students) {
+    insertStd.run(s.military_number, s.name);
+  }
+
+  // 3. Insert families
+  const insertFam = db.prepare('INSERT INTO families (id, student_number, name, national_id, relation, attended) VALUES (?, ?, ?, ?, ?, ?)');
+  for (const f of snapshot.families || []) {
+    insertFam.run(
+      f.id !== undefined && f.id !== null ? Number(f.id) : null,
+      f.student_number,
+      f.name,
+      f.national_id || '',
+      f.relation || '',
+      f.attended === 0 ? 0 : 1
+    );
+  }
+
+  // 4. Insert bus seats
+  const insertSeat = db.prepare('INSERT INTO buses (bus_number, student_number, seated_at) VALUES (?, ?, ?)');
+  for (const b of snapshot.buses || []) {
+    insertSeat.run(Number(b.bus_number), b.student_number, b.seated_at || new Date().toISOString());
+  }
+
+  // 5. Update settings if included
+  if (snapshot.settings && typeof snapshot.settings === 'object') {
+    saveSettings(snapshot.settings);
+  }
+
+  return {
+    success: true,
+    studentsCount: snapshot.students.length,
+    familiesCount: (snapshot.families || []).length,
+    seatedCount: (snapshot.buses || []).length,
+    timestamp: new Date().toISOString()
+  };
+}).immediate;
+
 export default {
   getState,
+  getReplicationSnapshot,
+  applyReplicationSnapshot,
   seatStudent,
+  autoSeatStudent,
   unseatStudent,
   moveStudent,
   addStudent,
   updateStudent,
   deleteStudent,
+  deleteAllStudents,
   updateSettings,
   resetSeating,
   importStudents

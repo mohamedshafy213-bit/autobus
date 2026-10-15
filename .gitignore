@@ -37,3 +37,8 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# SQLite temporary runtime files
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal

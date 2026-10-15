@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import svc from '../services/seatingService.js';
+import replicationService from '../services/replicationService.js';
 import { getSettings } from '../settings.js';
 import { dbPath } from '../db.js';
 import fs from 'node:fs';
@@ -30,20 +31,30 @@ router.get('/state', handler((req, res) => {
 // 2) SEATING (CONFLICT PREVENTION)
 // ============================================================
 router.post('/seat', handler((req, res) => {
-  const { studentNumber, busNumber } = req.body;
-  const result = svc.seatStudent(studentNumber, busNumber);
+  const { studentNumber, busNumber, attendedMemberIds } = req.body;
+  const result = svc.seatStudent(studentNumber, busNumber, attendedMemberIds);
+  replicationService.queueAutoReplication();
+  res.json(result);
+}));
+
+router.post('/auto-seat', handler((req, res) => {
+  const { studentNumber, attendedMemberIds } = req.body;
+  const result = svc.autoSeatStudent(studentNumber, attendedMemberIds);
+  replicationService.queueAutoReplication();
   res.json(result);
 }));
 
 router.post('/unseat', handler((req, res) => {
   const { studentNumber } = req.body;
   const result = svc.unseatStudent(studentNumber);
+  replicationService.queueAutoReplication();
   res.json(result);
 }));
 
 router.post('/move', handler((req, res) => {
-  const { studentNumber, busNumber } = req.body;
-  const result = svc.moveStudent(studentNumber, busNumber);
+  const { studentNumber, busNumber, attendedMemberIds } = req.body;
+  const result = svc.moveStudent(studentNumber, busNumber, attendedMemberIds);
+  replicationService.queueAutoReplication();
   res.json(result);
 }));
 
@@ -52,17 +63,38 @@ router.post('/move', handler((req, res) => {
 // ============================================================
 router.post('/students', handler((req, res) => {
   const result = svc.addStudent(req.body);
+  replicationService.queueAutoReplication();
   res.status(201).json(result);
 }));
 
 router.put('/students/:number', handler((req, res) => {
   const result = svc.updateStudent(req.params.number, req.body);
+  replicationService.queueAutoReplication();
+  res.json(result);
+}));
+
+router.delete('/students', handler((req, res) => {
+  const result = svc.deleteAllStudents();
+  replicationService.queueAutoReplication();
+  res.json(result);
+}));
+
+router.post('/students/delete-all', handler((req, res) => {
+  const result = svc.deleteAllStudents();
+  replicationService.queueAutoReplication();
+  res.json(result);
+}));
+
+router.post('/delete-all-students', handler((req, res) => {
+  const result = svc.deleteAllStudents();
+  replicationService.queueAutoReplication();
   res.json(result);
 }));
 
 router.delete('/students/:number', handler((req, res) => {
   const force = req.query.force === 'true' || req.query.force === '1';
   const result = svc.deleteStudent(req.params.number, force);
+  replicationService.queueAutoReplication();
   res.json(result);
 }));
 
@@ -76,6 +108,7 @@ router.get('/settings', handler((req, res) => {
 
 router.put('/settings', handler((req, res) => {
   const updated = svc.updateSettings(req.body);
+  replicationService.queueAutoReplication();
   res.json(updated);
 }));
 
@@ -88,11 +121,13 @@ router.post('/import', handler((req, res) => {
     return res.status(400).json({ code: 'INVALID_DATA', message: 'صيغة بيانات الاستيراد غير صالحة' });
   }
   const report = svc.importStudents(students, mode || 'skip');
+  replicationService.queueAutoReplication();
   res.json(report);
 }));
 
 router.post('/reset-seating', handler((req, res) => {
   const result = svc.resetSeating();
+  replicationService.queueAutoReplication();
   res.json(result);
 }));
 
@@ -101,6 +136,58 @@ router.get('/export/backup', handler((req, res) => {
     return res.status(404).json({ code: 'NOT_FOUND', message: 'ملف قاعدة البيانات غير موجود' });
   }
   res.download(dbPath, `buses_backup_${new Date().toISOString().slice(0, 10)}.db`);
+}));
+
+// ============================================================
+// 5.1) REPLICATION & FAILOVER (PRIMARY <-> BACKUP)
+// ============================================================
+
+// Returns full replication snapshot of current database & settings
+router.get('/replication/snapshot', handler((req, res) => {
+  const snapshot = svc.getReplicationSnapshot();
+  res.json(snapshot);
+}));
+
+// Applies incoming snapshot from Primary into local database
+router.post('/replication/apply', handler((req, res) => {
+  const snapshot = req.body;
+  const result = svc.applyReplicationSnapshot(snapshot);
+  res.json(result);
+}));
+
+// Trigger manual or immediate push to Backup server
+router.post('/replication/sync-now', handler(async (req, res) => {
+  const targetUrl = req.body && req.body.backupUrl;
+  const result = await replicationService.pushToBackupServer(targetUrl);
+  res.json(result);
+}));
+
+// Trigger manual pull from Primary server into this server
+router.post('/replication/pull-now', handler(async (req, res) => {
+  const primaryUrl = req.body && req.body.primaryUrl;
+  const result = await replicationService.pullFromPrimaryServer(primaryUrl);
+  res.json(result);
+}));
+
+// Get replication health and last sync status
+router.get('/replication/status', handler((req, res) => {
+  const status = replicationService.getReplicationStatus();
+  res.json(status);
+}));
+
+// ============================================================
+// 6) SYSTEM / NETWORK DEVICE INFO
+// ============================================================
+router.get('/info', handler((req, res) => {
+  const rawClientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString();
+  const clientIp = rawClientIp.replace(/^.*:/, ''); // strip IPv6 prefix ::ffff:
+  const isLocal = clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '' || clientIp === '1';
+
+  res.json({
+    serverIp: '130.117.53.42',
+    clientIp: isLocal ? '127.0.0.1' : clientIp,
+    isServerDevice: isLocal || clientIp === '130.117.53.42'
+  });
 }));
 
 // ============================================================

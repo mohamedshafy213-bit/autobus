@@ -121,7 +121,38 @@
         </nav>
 
         <!-- Live Header Info & Server Connection Status -->
-        <div class="hidden md:flex items-center gap-4">
+        <div class="hidden lg:flex items-center gap-3">
+          
+          <!-- Device & Server Mode Badge (Primary vs Backup Failover) -->
+          <div
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
+            :class="[
+              store.failover.activeServer === 'backup'
+                ? 'bg-amber-950/90 text-amber-200 border border-amber-500/60 ring-2 ring-amber-500/40 animate-pulse'
+                : (store.deviceInfo.isServerDevice
+                    ? 'bg-purple-950/90 text-purple-200 border border-purple-500/40 ring-1 ring-purple-500/20'
+                    : 'bg-cyan-950/90 text-cyan-200 border border-cyan-500/40 ring-1 ring-cyan-500/20')
+            ]"
+            :title="store.failover.activeServer === 'backup' ? 'تنبيه: أنت متصل بالسيرفر الاحتياطي (وضع الطوارئ)' : 'أنت متصل بالسيرفر الرئيسي'"
+          >
+            <i :class="store.failover.activeServer === 'backup' ? 'pi pi-exclamation-triangle text-amber-400' : (store.deviceInfo.isServerDevice ? 'pi pi-server text-purple-400' : 'pi pi-desktop text-cyan-400')"></i>
+            <span>{{ store.failover.activeServer === 'backup' ? 'السيرفر الاحتياطي (طوارئ)' : (store.deviceInfo.isServerDevice ? 'السيرفر الرئيسي' : 'جهاز عميل') }}</span>
+            <span class="font-mono text-[11px] opacity-80 ms-1 px-1.5 py-0.2 rounded bg-black/30">
+              {{ store.failover.activeServer === 'backup' ? 'BACKUP' : (store.deviceInfo.isServerDevice ? 'SERVER' : (store.deviceInfo.clientIp || 'CLIENT')) }}
+            </span>
+          </div>
+
+          <!-- Secondary / Backup Sync Indicator if on Primary -->
+          <div
+            v-if="store.failover.activeServer === 'primary' && store.failover.backupUrl"
+            class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold border transition-all"
+            :class="store.failover.backupOnline ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'"
+            :title="store.failover.backupOnline ? `السيرفر الاحتياطي متصل ومتزامن (${store.failover.backupUrl})` : `السيرفر الاحتياطي غير متصل (${store.failover.backupUrl})`"
+          >
+            <span class="w-2 h-2 rounded-full" :class="store.failover.backupOnline ? 'bg-emerald-400' : 'bg-slate-500'"></span>
+            <span>الاحتياطي: {{ store.failover.backupOnline ? 'متزامن ✓' : 'غير متصل' }}</span>
+          </div>
+
           <!-- Live Quick Numbers -->
           <div class="flex items-center gap-3 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
             <div>
@@ -147,6 +178,24 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- Emergency Failover Top Alert Banner -->
+      <div
+        v-if="store.failover.activeServer === 'backup'"
+        class="bg-amber-600 text-slate-950 text-xs font-black py-1.5 px-4 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-2">
+          <i class="pi pi-exclamation-circle text-base"></i>
+          <span>تنبيه طوارئ: تم التحويل تلقائياً إلى السيرفر الاحتياطي بسبب تعذر الاتصال بالسيرفر الرئيسي. العمل مستمر والبيانات محفوظة.</span>
+        </div>
+        <button
+          v-if="store.failover.primaryOnline"
+          @click="store.switchActiveServer('primary')"
+          class="bg-black/80 hover:bg-black text-white px-3 py-0.5 rounded text-[11px] font-bold cursor-pointer"
+        >
+          العودة للسيرفر الرئيسي (متوفر الآن ⚡)
+        </button>
       </div>
     </div>
   </header>

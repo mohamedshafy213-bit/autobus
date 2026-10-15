@@ -71,8 +71,11 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   }
 
   console.log('--------------------------------------------------------------------');
-  console.log(`  * Database: data/buses.db (SQLite WAL Mode)`);
-  console.log(`  * Port:     ${PORT}`);
+  console.log('  [NETWORK CONFIGURATION / إعدادات الأجهزة]');
+  console.log('  * Server Laptop IP:           130.117.53.42');
+  console.log('  * Client Connection URL:      http://130.117.53.42:3000');
+  console.log('  * Database (Shared):          data/buses.db (SQLite WAL Mode)');
+  console.log(`  * Port:                       ${PORT}`);
   console.log('====================================================================');
   console.log('  Ready for connections. Press Ctrl+C to stop.');
   console.log('');

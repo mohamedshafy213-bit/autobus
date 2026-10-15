@@ -281,17 +281,25 @@
                 <div class="text-xs text-slate-600 font-semibold flex flex-wrap items-center gap-1.5 mt-1">
                   <span class="text-slate-400 font-bold">↳ المرافقين:</span>
                   <span
-                    v-for="m in passenger.families"
+                    v-for="m in (passenger.families || []).filter(f => f.attended)"
                     :key="m.id"
                     class="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[11px] font-bold"
                   >
                     {{ m.name }} ({{ m.relation || 'مرافق' }})
                   </span>
-                  <span v-if="!passenger.families || passenger.families.length === 0" class="text-slate-400 italic text-[11px]">
-                    (بدون مرافقين)
+                  <span
+                    v-for="m in (passenger.families || []).filter(f => !f.attended)"
+                    :key="'absent-' + m.id"
+                    class="bg-red-50 text-red-700 border border-red-200 line-through px-1.5 py-0.5 rounded text-[10px]"
+                    title="غائب / لم يحضر"
+                  >
+                    {{ m.name }} (غائب)
+                  </span>
+                  <span v-if="!passenger.families || passenger.families.filter(f => f.attended).length === 0" class="text-slate-400 italic text-[11px]">
+                    (بدون مرافقين حاضرين)
                   </span>
                   <span class="text-slate-500 text-[11px] font-bold font-mono">
-                    | الإجمالي: {{ passenger.persons_count }} فرد
+                    | الحاضرين بالأوتوبيس: {{ passenger.persons_count }} فرد
                   </span>
                 </div>
               </div>

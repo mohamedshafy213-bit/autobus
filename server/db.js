@@ -32,6 +32,7 @@ db.exec(`
     name TEXT NOT NULL,
     national_id TEXT,
     relation TEXT,
+    attended INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (student_number) REFERENCES students(military_number) ON UPDATE CASCADE ON DELETE CASCADE
   );
 
@@ -45,6 +46,19 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_buses_bus_number ON buses(bus_number);
 `);
+
+// Migration for existing tables: ensure 'attended' column exists and defaults to 1
+try {
+  const columns = db.pragma('table_info(families)');
+  const hasAttended = columns.some(c => c.name === 'attended');
+  if (!hasAttended) {
+    db.exec('ALTER TABLE families ADD COLUMN attended INTEGER NOT NULL DEFAULT 1');
+  }
+  // All family members default to attended = 1 so they are not marked as absent by mistake
+  db.exec('UPDATE families SET attended = 1 WHERE attended = 0 OR attended IS NULL');
+} catch (err) {
+  console.error('Migration error on families table:', err);
+}
 
 export { db, dbPath, dataDir };
 export default db;
