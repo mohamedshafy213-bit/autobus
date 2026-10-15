@@ -21,8 +21,8 @@ if %errorlevel% neq 0 (
 )
 
 :: 2. التحقق من تنزيل المكتبات والاعتماديات تلقائياً
-if not exist "node_modules\" (
-    echo [1/3] جاري تنزيل وتثبيت مكتبات المنظومة لأول مرة (npm install)...
+if not exist "node_modules" (
+    echo [1/3] جاري تنزيل وتثبيت مكتبات المنظومة لأول مرة ^(npm install^)...
     call npm install
     if %errorlevel% neq 0 (
         echo [خطأ] فشل في تنزيل المكتبات، يرجى التأكد من اتصال الإنترنت ثم إعادة المحاولة.
@@ -35,7 +35,7 @@ if not exist "node_modules\" (
 
 :: 3. التحقق من بناء واجهة المستخدم
 if not exist "server\public\index.html" (
-    echo [2/3] جاري بناء واجهة المستخدم (npm run build)...
+    echo [2/3] جاري بناء واجهة المستخدم ^(npm run build^)...
     call npm run build
     if %errorlevel% neq 0 (
         echo [خطأ] فشل في بناء الواجهة.
