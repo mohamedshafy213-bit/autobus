@@ -230,10 +230,42 @@
           </span>
         </div>
 
+        <!-- Default Max Regular Families (<= 4 invitations) -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700">
+            حد عائلات 4 دعوات أو أقل (الافتراضي 7):
+          </label>
+          <InputNumber
+            v-model="form.defaultMaxRegularFamilies"
+            :min="1"
+            :max="30"
+            class="w-full !text-sm font-mono font-bold"
+          />
+          <span class="text-[11px] text-slate-400 block">
+            عداد العائلات العادية لكل أتوبيس (الموصى به: 7)
+          </span>
+        </div>
+
+        <!-- Default Max Special Families (> 4 invitations) -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700">
+            حد عائلات أكثر من 4 دعوات (الافتراضي 2):
+          </label>
+          <InputNumber
+            v-model="form.defaultMaxSpecialFamilies"
+            :min="1"
+            :max="15"
+            class="w-full !text-sm font-mono font-bold"
+          />
+          <span class="text-[11px] text-slate-400 block">
+            عداد أسر الـ 6 دعوات الخاصة (الموصى به: 2)
+          </span>
+        </div>
+
         <!-- Default Max Families -->
         <div class="space-y-1.5">
           <label class="block text-xs font-bold text-slate-700">
-            الحد الأقصى الافتراضي للعائلات:
+            إجمالي الحد الأقصى للعائلات:
           </label>
           <InputNumber
             v-model="form.defaultMaxFamilies"
@@ -242,7 +274,7 @@
             class="w-full !text-sm font-mono font-bold"
           />
           <span class="text-[11px] text-slate-400 block">
-            الافتراضي الموصى به: 8 عائلات لكل أتوبيس
+            إجمالي العائلات (الافتراضي: 9 عائلات = 7 + 2)
           </span>
         </div>
 
@@ -258,7 +290,7 @@
             class="w-full !text-sm font-mono font-bold"
           />
           <span class="text-[11px] text-slate-400 block">
-            الافتراضي الموصى به: 40 فرد لكل أتوبيس
+            الافتراضي الموصى به: 50 فرد لكل أتوبيس
           </span>
         </div>
       </div>
@@ -411,8 +443,10 @@ const syncing = ref(false);
 
 const form = reactive({
   busCount: 28,
-  defaultMaxFamilies: 8,
-  defaultMaxPersons: 40,
+  defaultMaxFamilies: 9,
+  defaultMaxPersons: 50,
+  defaultMaxRegularFamilies: 7,
+  defaultMaxSpecialFamilies: 2,
   autoSeating: false,
   backupServerUrl: '',
   overrides: {}
@@ -422,8 +456,10 @@ const busTableData = ref([]);
 
 function populateFormFromStore() {
   form.busCount = store.settings.busCount || 28;
-  form.defaultMaxFamilies = store.settings.defaultMaxFamilies || 8;
-  form.defaultMaxPersons = store.settings.defaultMaxPersons || 40;
+  form.defaultMaxFamilies = store.settings.defaultMaxFamilies || 9;
+  form.defaultMaxPersons = store.settings.defaultMaxPersons || 50;
+  form.defaultMaxRegularFamilies = store.settings.defaultMaxRegularFamilies || 7;
+  form.defaultMaxSpecialFamilies = store.settings.defaultMaxSpecialFamilies || 2;
   form.autoSeating = !!store.settings.autoSeating;
   form.backupServerUrl = store.settings.backupServerUrl || store.failover.backupUrl || '';
   form.overrides = { ...(store.settings.overrides || {}) };
@@ -503,6 +539,8 @@ async function saveSettings() {
       busCount: Number(form.busCount),
       defaultMaxFamilies: Number(form.defaultMaxFamilies),
       defaultMaxPersons: Number(form.defaultMaxPersons),
+      defaultMaxRegularFamilies: Number(form.defaultMaxRegularFamilies || 7),
+      defaultMaxSpecialFamilies: Number(form.defaultMaxSpecialFamilies || 2),
       autoSeating: Boolean(form.autoSeating),
       backupServerUrl: String(form.backupServerUrl || '').trim(),
       overrides: cleanOverrides

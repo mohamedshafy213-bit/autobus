@@ -19,6 +19,7 @@ const stmts = {
 
   getBusSeatByStudent: db.prepare('SELECT * FROM buses WHERE student_number = ?'),
   getAllBusSeats: db.prepare('SELECT * FROM buses ORDER BY bus_number, seated_at ASC'),
+  getBusStudents: db.prepare('SELECT student_number FROM buses WHERE bus_number = ?'),
   countFamiliesInBus: db.prepare('SELECT COUNT(*) as cnt FROM buses WHERE bus_number = ?'),
   countMembersInBus: db.prepare(`
     SELECT COUNT(*) as cnt 
@@ -67,13 +68,27 @@ function getAttendingPersonsCount(stdNum, attendedMemberIds) {
 
 /**
  * Get current capacity counts for a bus inside a transaction
+ * Tracks total families, regular families (<= 4 members), and special families (> 4 members)
  */
 function getBusCountsInsideTx(busNumber) {
-  const familiesCount = stmts.countFamiliesInBus.get(busNumber)?.cnt || 0;
+  const busStudents = stmts.getBusStudents.all(busNumber);
+  const familiesCount = busStudents.length;
+  let regularFamiliesCount = 0;
+  let specialFamiliesCount = 0;
+
+  for (const row of busStudents) {
+    const memCount = stmts.countFamiliesByStudent.get(row.student_number)?.cnt || 0;
+    if (memCount > 4) {
+      specialFamiliesCount++;
+    } else {
+      regularFamiliesCount++;
+    }
+  }
+
   const membersCount = stmts.countMembersInBus.get(busNumber)?.cnt || 0;
   // Total persons = 1 student per family + attended family members
   const personsCount = familiesCount + membersCount;
-  return { familiesCount, personsCount };
+  return { familiesCount, regularFamiliesCount, specialFamiliesCount, personsCount };
 }
 
 /**
@@ -123,10 +138,16 @@ export function getState() {
     // When seated: persons_count is 1 (student) + attended members.
     // When not seated: persons_count is 1 + all registered members.
     const persons_count = seat ? (1 + attendedMemsCount) : (1 + mems.length);
+    const families_count = mems.length;
+    const is_special = families_count > 4;
+
     return {
       military_number: student.military_number,
       name: student.name,
       families: mems,
+      families_count,
+      is_special,
+      invitations_count: families_count,
       bus_number: seat ? seat.bus_number : null,
       seated_at: seat ? seat.seated_at : null,
       persons_count,
@@ -143,7 +164,11 @@ export function getState() {
       number: i,
       maxFamilies: limits.maxFamilies,
       maxPersons: limits.maxPersons,
+      maxRegularFamilies: limits.maxRegularFamilies,
+      maxSpecialFamilies: limits.maxSpecialFamilies,
       familiesCount: 0,
+      regularFamiliesCount: 0,
+      specialFamiliesCount: 0,
       personsCount: 0
     });
   }
@@ -154,6 +179,11 @@ export function getState() {
       const b = busMap.get(s.bus_number);
       b.familiesCount += 1;
       b.personsCount += s.persons_count;
+      if (s.is_special) {
+        b.specialFamiliesCount += 1;
+      } else {
+        b.regularFamiliesCount += 1;
+      }
     }
   }
 
@@ -209,6 +239,29 @@ export const seatStudent = db.transaction((studentNumber, busNumber, attendedMem
   const limits = getBusLimits(busNum, settings);
   const currentCounts = getBusCountsInsideTx(busNum);
   const thisFamilyPersons = getAttendingPersonsCount(stdNum, attendedMemberIds);
+  const registeredMemberCount = stmts.countFamiliesByStudent.get(stdNum)?.cnt || 0;
+  const isSpecial = registeredMemberCount > 4;
+
+  // Category specific limits (regular <= 4: max 7, special > 4: max 2)
+  if (isSpecial) {
+    if (currentCounts.specialFamiliesCount + 1 > limits.maxSpecialFamilies) {
+      const err = new Error(`الأتوبيس رقم ${busNum} لم يعد يتسع لعائلات أكثر من 4 دعوات (اكتمل الحد الأقصى: ${limits.maxSpecialFamilies} عائلات)، اختر أتوبيساً آخر`);
+      err.code = 'BUS_FULL';
+      err.status = 409;
+      err.busNumber = busNum;
+      err.reason = 'SPECIAL_FAMILIES';
+      throw err;
+    }
+  } else {
+    if (currentCounts.regularFamiliesCount + 1 > limits.maxRegularFamilies) {
+      const err = new Error(`الأتوبيس رقم ${busNum} لم يعد يتسع لعائلات 4 دعوات أو أقل (اكتمل الحد الأقصى: ${limits.maxRegularFamilies} عائلات)، اختر أتوبيساً آخر`);
+      err.code = 'BUS_FULL';
+      err.status = 409;
+      err.busNumber = busNum;
+      err.reason = 'REGULAR_FAMILIES';
+      throw err;
+    }
+  }
 
   if (currentCounts.familiesCount + 1 > limits.maxFamilies) {
     const err = new Error(`الأتوبيس رقم ${busNum} لم يعد يتسع (اكتمل عدد العائلات)، اختر أتوبيساً آخر`);
@@ -268,12 +321,19 @@ export const autoSeatStudent = db.transaction((studentNumber, attendedMemberIds)
 
   const settings = getSettings();
   const thisFamilyPersons = getAttendingPersonsCount(stdNum, attendedMemberIds);
+  const registeredMemberCount = stmts.countFamiliesByStudent.get(stdNum)?.cnt || 0;
+  const isSpecial = registeredMemberCount > 4;
 
   let assignedBus = null;
   for (let b = 1; b <= settings.busCount; b++) {
     const limits = getBusLimits(b, settings);
     const counts = getBusCountsInsideTx(b);
-    if (counts.familiesCount + 1 <= limits.maxFamilies && counts.personsCount + thisFamilyPersons <= limits.maxPersons) {
+
+    const categoryFits = isSpecial
+      ? (counts.specialFamiliesCount + 1 <= limits.maxSpecialFamilies)
+      : (counts.regularFamiliesCount + 1 <= limits.maxRegularFamilies);
+
+    if (categoryFits && counts.familiesCount + 1 <= limits.maxFamilies && counts.personsCount + thisFamilyPersons <= limits.maxPersons) {
       assignedBus = b;
       break;
     }
@@ -357,17 +417,40 @@ export const moveStudent = db.transaction((studentNumber, targetBusNumber, atten
   }
 
   const thisFamilyPersons = getAttendingPersonsCount(stdNum, attendedMemberIds);
+  const registeredMemberCount = stmts.countFamiliesByStudent.get(stdNum)?.cnt || 0;
+  const isSpecial = registeredMemberCount > 4;
 
   // If targetBus is different from currentBus, check capacity
   if (targetBus !== currentBus) {
     const limits = getBusLimits(targetBus, settings);
     const counts = getBusCountsInsideTx(targetBus);
 
+    if (isSpecial) {
+      if (counts.specialFamiliesCount + 1 > limits.maxSpecialFamilies) {
+        const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع لعائلات أكثر من 4 دعوات (اكتمل الحد الأقصى: ${limits.maxSpecialFamilies} عائلات)، اختر أتوبيساً آخر`);
+        err.code = 'BUS_FULL';
+        err.status = 409;
+        err.busNumber = targetBus;
+        err.reason = 'SPECIAL_FAMILIES';
+        throw err;
+      }
+    } else {
+      if (counts.regularFamiliesCount + 1 > limits.maxRegularFamilies) {
+        const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع لعائلات 4 دعوات أو أقل (اكتمل الحد الأقصى: ${limits.maxRegularFamilies} عائلات)، اختر أتوبيساً آخر`);
+        err.code = 'BUS_FULL';
+        err.status = 409;
+        err.busNumber = targetBus;
+        err.reason = 'REGULAR_FAMILIES';
+        throw err;
+      }
+    }
+
     if (counts.familiesCount + 1 > limits.maxFamilies) {
       const err = new Error(`الأتوبيس رقم ${targetBus} لم يعد يتسع (اكتمل عدد العائلات)، اختر أتوبيساً آخر`);
       err.code = 'BUS_FULL';
       err.status = 409;
       err.busNumber = targetBus;
+      err.reason = 'FAMILIES';
       throw err;
     }
 
@@ -376,6 +459,7 @@ export const moveStudent = db.transaction((studentNumber, targetBusNumber, atten
       err.code = 'BUS_FULL';
       err.status = 409;
       err.busNumber = targetBus;
+      err.reason = 'PERSONS';
       throw err;
     }
 

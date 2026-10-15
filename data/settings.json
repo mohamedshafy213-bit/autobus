@@ -1,14 +1,11 @@
 {
-  "busCount": 28,
+  "busCount": 26,
   "defaultMaxFamilies": 9,
-  "defaultMaxPersons": 45,
+  "defaultMaxPersons": 50,
+  "defaultMaxRegularFamilies": 7,
+  "defaultMaxSpecialFamilies": 2,
   "autoSeating": false,
   "backupServerUrl": "",
   "autoReplicate": true,
-  "overrides": {
-    "28": {
-      "maxFamilies": 1,
-      "maxPersons": 10
-    }
-  }
+  "overrides": {}
 }

@@ -47,13 +47,40 @@
           الكل ({{ busCardsData.length }})
         </button>
 
+        <!-- Category Filters -->
+        <button
+          @click="busStatusFilter = 'available_regular'"
+          :class="[
+            'px-3 py-1.5 rounded-xl text-xs font-bold transition-all',
+            busStatusFilter === 'available_regular'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+          ]"
+          title="أتوبيسات بها أماكن لعائلات 4 دعوات أو أقل (أقل من 7)"
+        >
+          متاح (≤ 4 دعوات) ({{ busCardsData.filter(b => b.regularFamiliesCount < b.maxRegularFamilies).length }})
+        </button>
+
+        <button
+          @click="busStatusFilter = 'available_special'"
+          :class="[
+            'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1',
+            busStatusFilter === 'available_special'
+              ? 'bg-purple-800 text-white shadow-sm'
+              : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+          ]"
+          title="أتوبيسات بها أماكن لعائلات أكثر من 4 دعوات (أقل من 2)"
+        >
+          <span>★ متاح (> 4 دعوات) ({{ busCardsData.filter(b => b.specialFamiliesCount < b.maxSpecialFamilies).length }})</span>
+        </button>
+
         <button
           @click="busStatusFilter = 'has_passengers'"
           :class="[
             'px-3 py-1.5 rounded-xl text-xs font-bold transition-all',
             busStatusFilter === 'has_passengers'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              ? 'bg-teal-700 text-white shadow-sm'
+              : 'bg-teal-50 text-teal-800 hover:bg-teal-100'
           ]"
         >
           بها ركاب ({{ busCardsData.filter(b => b.familiesCount > 0).length }})
@@ -181,13 +208,52 @@
         </div>
 
         <!-- Card Body: Utilization Stats -->
-        <div class="p-4 sm:p-5 space-y-4">
-          <!-- Families Progress -->
+        <div class="p-4 sm:p-5 space-y-3.5">
+          <!-- Dual Category Invitation Counters (<= 4 and > 4) -->
+          <div class="grid grid-cols-2 gap-2 p-2.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <!-- Regular Families Counter (out of 7) -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px] font-bold">
+                <span class="text-slate-600">≤ 4 دعوات:</span>
+                <span
+                  class="font-mono text-xs font-black"
+                  :class="bus.regularFamiliesCount > bus.maxRegularFamilies ? 'text-red-600' : (bus.regularFamiliesCount >= bus.maxRegularFamilies ? 'text-amber-600' : 'text-emerald-700')"
+                >
+                  {{ bus.regularFamiliesCount }} / {{ bus.maxRegularFamilies }}
+                </span>
+              </div>
+              <ProgressBar
+                :value="Math.min(100, Math.round((bus.regularFamiliesCount / bus.maxRegularFamilies) * 100))"
+                :showValue="false"
+                class="!h-1.5 !bg-slate-200"
+              />
+            </div>
+
+            <!-- Special Families Counter (out of 2) -->
+            <div class="space-y-1 border-s border-slate-200 ps-2">
+              <div class="flex items-center justify-between text-[11px] font-bold">
+                <span class="text-purple-900">★ > 4 دعوات:</span>
+                <span
+                  class="font-mono text-xs font-black"
+                  :class="bus.specialFamiliesCount > bus.maxSpecialFamilies ? 'text-red-600' : (bus.specialFamiliesCount >= bus.maxSpecialFamilies ? 'text-purple-900' : 'text-purple-700')"
+                >
+                  {{ bus.specialFamiliesCount }} / {{ bus.maxSpecialFamilies }}
+                </span>
+              </div>
+              <ProgressBar
+                :value="Math.min(100, Math.round((bus.specialFamiliesCount / bus.maxSpecialFamilies) * 100))"
+                :showValue="false"
+                class="!h-1.5 !bg-slate-200"
+              />
+            </div>
+          </div>
+
+          <!-- Total Families Progress -->
           <div>
-            <div class="flex justify-between text-xs font-bold text-slate-700 mb-1.5">
+            <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
               <span class="flex items-center gap-1.5">
                 <i class="pi pi-users text-slate-400"></i>
-                إشغال العائلات:
+                إجمالي العائلات:
               </span>
               <span class="font-mono text-slate-900">
                 <strong
@@ -202,13 +268,13 @@
             <ProgressBar
               :value="Math.min(100, Math.round((bus.familiesCount / bus.maxFamilies) * 100))"
               :showValue="false"
-              class="!h-2 !bg-slate-100"
+              class="!h-1.5 !bg-slate-100"
             />
           </div>
 
           <!-- Persons Progress -->
           <div>
-            <div class="flex justify-between text-xs font-bold text-slate-700 mb-1.5">
+            <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
               <span class="flex items-center gap-1.5">
                 <i class="pi pi-user text-slate-400"></i>
                 إشغال الأفراد:
@@ -226,7 +292,7 @@
             <ProgressBar
               :value="Math.min(100, Math.round((bus.personsCount / bus.maxPersons) * 100))"
               :showValue="false"
-              class="!h-2 !bg-slate-100"
+              class="!h-1.5 !bg-slate-100"
             />
           </div>
         </div>
@@ -273,9 +339,21 @@
               </span>
               <div>
                 <!-- Student Name in Bold Dark -->
-                <div class="text-sm font-black text-slate-900" style="font-weight: 800;">
-                  {{ passenger.name }}
-                  <span class="text-xs font-mono font-normal text-slate-500 ms-1">({{ passenger.military_number }})</span>
+                <div class="text-sm font-black text-slate-900 flex items-center gap-1.5 flex-wrap" style="font-weight: 800;">
+                  <span>{{ passenger.name }}</span>
+                  <span class="text-xs font-mono font-normal text-slate-500">({{ passenger.military_number }})</span>
+                  <span
+                    v-if="(passenger.families || []).length > 4"
+                    class="bg-purple-100 text-purple-800 border border-purple-200 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                  >
+                    ★ {{ (passenger.families || []).length }} دعوات
+                  </span>
+                  <span
+                    v-else
+                    class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                  >
+                    {{ (passenger.families || []).length }} دعوات
+                  </span>
                 </div>
                 <!-- Indented Family Members -->
                 <div class="text-xs text-slate-600 font-semibold flex flex-wrap items-center gap-1.5 mt-1">
@@ -387,19 +465,35 @@ const busCardsData = computed(() => {
   return store.buses.map(bus => {
     const passengers = store.students.filter(s => s.bus_number === bus.number);
     const familiesCount = passengers.length;
+    let regularFamiliesCount = 0;
+    let specialFamiliesCount = 0;
     let personsCount = 0;
+
     passengers.forEach(p => {
       personsCount += (p.persons_count || (1 + (p.families ? p.families.length : 0)));
+      const memCount = (p.families || []).length;
+      if (memCount > 4) {
+        specialFamiliesCount++;
+      } else {
+        regularFamiliesCount++;
+      }
     });
 
-    const isFull = familiesCount >= bus.maxFamilies || personsCount >= bus.maxPersons;
-    const isOverLimit = familiesCount > bus.maxFamilies || personsCount > bus.maxPersons;
+    const maxRegular = bus.maxRegularFamilies !== undefined ? bus.maxRegularFamilies : (store.settings.defaultMaxRegularFamilies || 7);
+    const maxSpecial = bus.maxSpecialFamilies !== undefined ? bus.maxSpecialFamilies : (store.settings.defaultMaxSpecialFamilies || 2);
+
+    const isFull = familiesCount >= bus.maxFamilies || personsCount >= bus.maxPersons || (regularFamiliesCount >= maxRegular && specialFamiliesCount >= maxSpecial);
+    const isOverLimit = familiesCount > bus.maxFamilies || personsCount > bus.maxPersons || regularFamiliesCount > maxRegular || specialFamiliesCount > maxSpecial;
 
     return {
       number: bus.number,
       maxFamilies: bus.maxFamilies,
       maxPersons: bus.maxPersons,
+      maxRegularFamilies: maxRegular,
+      maxSpecialFamilies: maxSpecial,
       familiesCount,
+      regularFamiliesCount,
+      specialFamiliesCount,
       personsCount,
       passengers,
       isFull,
@@ -411,6 +505,8 @@ const busCardsData = computed(() => {
 const filteredBusCards = computed(() => {
   return busCardsData.value.filter(bus => {
     // Status Filter
+    if (busStatusFilter.value === 'available_regular' && bus.regularFamiliesCount >= bus.maxRegularFamilies) return false;
+    if (busStatusFilter.value === 'available_special' && bus.specialFamiliesCount >= bus.maxSpecialFamilies) return false;
     if (busStatusFilter.value === 'has_passengers' && bus.familiesCount === 0) return false;
     if (busStatusFilter.value === 'full' && (!bus.isFull || bus.isOverLimit)) return false;
     if (busStatusFilter.value === 'empty' && bus.familiesCount > 0) return false;

@@ -179,6 +179,35 @@
             <i class="pi pi-user-minus text-[10px]"></i>
             أسر بها غائبين ({{ stats.partialAttendanceStudents }})
           </button>
+
+          <span class="text-slate-300 mx-1">|</span>
+
+          <!-- Invitation Category Filters -->
+          <button
+            @click="store.invitationFilter = store.invitationFilter === 'regular' ? 'all' : 'regular'"
+            :class="[
+              'px-3 py-1.5 rounded-xl text-xs font-bold transition-all',
+              store.invitationFilter === 'regular'
+                ? 'bg-emerald-700 text-white shadow-sm ring-2 ring-emerald-400/40'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            ]"
+            title="تصفية الطلاب الذين لديهم 4 دعوات أو أقل"
+          >
+            ≤ 4 دعوات ({{ stats.regularStudents }})
+          </button>
+
+          <button
+            @click="store.invitationFilter = store.invitationFilter === 'special' ? 'all' : 'special'"
+            :class="[
+              'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1',
+              store.invitationFilter === 'special'
+                ? 'bg-purple-800 text-white shadow-sm ring-2 ring-purple-400/40'
+                : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+            ]"
+            title="تصفية الطلاب الذين لديهم أكثر من 4 دعوات (دعوات خاصة)"
+          >
+            <span>★ > 4 دعوات ({{ stats.specialStudents }})</span>
+          </button>
         </div>
 
         <!-- Bus filter dropdown & Reset -->
@@ -193,7 +222,7 @@
             class="w-44 !text-xs font-bold"
           />
           <Button
-            v-if="store.searchQuery || store.statusFilter !== 'all' || store.busFilter !== null"
+            v-if="store.searchQuery || store.statusFilter !== 'all' || store.invitationFilter !== 'all' || store.busFilter !== null"
             icon="pi pi-filter-slash"
             severity="secondary"
             text
@@ -246,13 +275,28 @@
           </template>
         </Column>
 
-        <!-- Family Count -->
-        <Column header="المرافقين" sortable style="width: 14%;">
+        <!-- Family Count (Invitations) -->
+        <Column field="families_count" header="المرافقين (الدعوات)" sortable style="width: 15%;">
           <template #body="{ data }">
             <div class="space-y-0.5">
-              <span class="font-mono font-bold text-slate-700 text-xs block">
-                {{ (data.families || []).length }} مرافق
-              </span>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-mono font-bold text-slate-700 text-xs block">
+                  {{ data.families_count }} مرافق
+                </span>
+                <span
+                  v-if="data.families_count > 4"
+                  class="bg-purple-100 text-purple-800 border border-purple-200 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                  title="فئة دعوات خاصة (أكثر من 4 دعوات)"
+                >
+                  ★ {{ data.families_count }} دعوات
+                </span>
+                <span
+                  v-else
+                  class="bg-slate-100 text-slate-600 px-1 py-0.5 rounded text-[10px] font-semibold"
+                >
+                  {{ data.families_count }} دعوات
+                </span>
+              </div>
               <!-- If seated and some members were absent -->
               <span
                 v-if="data.bus_number && data.families && data.families.length > 0 && data.families.some(m => !m.attended)"
@@ -266,7 +310,7 @@
         </Column>
 
         <!-- Total Persons (1 + family) -->
-        <Column header="إجمالي الأفراد" sortable style="width: 12%;">
+        <Column field="persons_count" header="إجمالي الأفراد" sortable style="width: 12%;">
           <template #body="{ data }">
             <div class="space-y-0.5">
               <span class="font-mono font-black text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs inline-block">
@@ -283,7 +327,7 @@
         </Column>
 
         <!-- Status Tag (لم يحضر / حضر) -->
-        <Column header="حالة الحضور" style="width: 12%;">
+        <Column field="bus_number" header="حالة الحضور" sortable style="width: 12%;">
           <template #body="{ data }">
             <Tag
               v-if="data.bus_number"
@@ -494,6 +538,7 @@ function clearSearch() {
 function resetAllFilters() {
   store.searchQuery = '';
   store.statusFilter = 'all';
+  store.invitationFilter = 'all';
   store.busFilter = null;
 }
 

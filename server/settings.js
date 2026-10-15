@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS = {
   busCount: 27,
   defaultMaxFamilies: 9,
   defaultMaxPersons: 50,
+  defaultMaxRegularFamilies: 7, // Families with <= 4 invitations
+  defaultMaxSpecialFamilies: 2, // Families with > 4 invitations
   autoSeating: false,
   backupServerUrl: '',
   autoReplicate: true,
@@ -28,6 +30,8 @@ export function getSettings() {
         busCount: Number(parsed.busCount) || DEFAULT_SETTINGS.busCount,
         defaultMaxFamilies: Number(parsed.defaultMaxFamilies) || DEFAULT_SETTINGS.defaultMaxFamilies,
         defaultMaxPersons: Number(parsed.defaultMaxPersons) || DEFAULT_SETTINGS.defaultMaxPersons,
+        defaultMaxRegularFamilies: Number(parsed.defaultMaxRegularFamilies) || DEFAULT_SETTINGS.defaultMaxRegularFamilies,
+        defaultMaxSpecialFamilies: Number(parsed.defaultMaxSpecialFamilies) || DEFAULT_SETTINGS.defaultMaxSpecialFamilies,
         autoSeating: Boolean(parsed.autoSeating),
         backupServerUrl: String(parsed.backupServerUrl || '').trim(),
         autoReplicate: parsed.autoReplicate !== undefined ? Boolean(parsed.autoReplicate) : true,
@@ -56,6 +60,8 @@ export function saveSettings(newSettings) {
     busCount: Math.max(1, Number(newSettings.busCount) || DEFAULT_SETTINGS.busCount),
     defaultMaxFamilies: Math.max(1, Number(newSettings.defaultMaxFamilies) || DEFAULT_SETTINGS.defaultMaxFamilies),
     defaultMaxPersons: Math.max(1, Number(newSettings.defaultMaxPersons) || DEFAULT_SETTINGS.defaultMaxPersons),
+    defaultMaxRegularFamilies: Math.max(1, Number(newSettings.defaultMaxRegularFamilies) || DEFAULT_SETTINGS.defaultMaxRegularFamilies),
+    defaultMaxSpecialFamilies: Math.max(1, Number(newSettings.defaultMaxSpecialFamilies) || DEFAULT_SETTINGS.defaultMaxSpecialFamilies),
     autoSeating: Boolean(newSettings.autoSeating),
     backupServerUrl: String(newSettings.backupServerUrl !== undefined ? newSettings.backupServerUrl : (getSettings().backupServerUrl || '')).trim(),
     autoReplicate: newSettings.autoReplicate !== undefined ? Boolean(newSettings.autoReplicate) : true,
@@ -75,8 +81,10 @@ export function getBusLimits(busNumber, settings = null) {
   const override = s.overrides[busKey];
 
   return {
-    maxFamilies: override && override.maxFamilies !== undefined ? Number(override.maxFamilies) : s.defaultMaxFamilies,
-    maxPersons: override && override.maxPersons !== undefined ? Number(override.maxPersons) : s.defaultMaxPersons
+    maxFamilies: override && override.maxFamilies !== undefined ? Number(override.maxFamilies) : (s.defaultMaxFamilies || 9),
+    maxPersons: override && override.maxPersons !== undefined ? Number(override.maxPersons) : (s.defaultMaxPersons || 50),
+    maxRegularFamilies: override && override.maxRegularFamilies !== undefined ? Number(override.maxRegularFamilies) : (s.defaultMaxRegularFamilies || 7),
+    maxSpecialFamilies: override && override.maxSpecialFamilies !== undefined ? Number(override.maxSpecialFamilies) : (s.defaultMaxSpecialFamilies || 2)
   };
 }
 

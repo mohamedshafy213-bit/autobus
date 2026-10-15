@@ -77,12 +77,45 @@
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       
       <!-- Table Search & Summary Header -->
-      <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-slate-800 text-sm">سجل الطلاب المسجلين</span>
-          <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">
-            {{ store.students.length }} طالب
-          </span>
+      <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-bold text-slate-800 text-sm me-1">سجل الطلاب:</span>
+          
+          <button
+            @click="invitationFilter = 'all'"
+            :class="[
+              'px-3 py-1 rounded-xl text-xs font-bold transition-all',
+              invitationFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            ]"
+          >
+            الكل ({{ store.students.length }})
+          </button>
+
+          <button
+            @click="invitationFilter = 'regular'"
+            :class="[
+              'px-3 py-1 rounded-xl text-xs font-bold transition-all',
+              invitationFilter === 'regular'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            ]"
+          >
+            ≤ 4 دعوات ({{ regularStudentsCount }})
+          </button>
+
+          <button
+            @click="invitationFilter = 'special'"
+            :class="[
+              'px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1',
+              invitationFilter === 'special'
+                ? 'bg-purple-700 text-white shadow-sm'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+            ]"
+          >
+            <span>★ > 4 دعوات ({{ specialStudentsCount }})</span>
+          </button>
         </div>
 
         <div class="w-full sm:w-72">
@@ -127,7 +160,7 @@
           </template>
         </Column>
 
-        <Column field="name" header="اسم الطالب" sortable style="width: 30%;">
+        <Column field="name" header="اسم الطالب" sortable style="width: 28%;">
           <template #body="{ data }">
             <span class="font-bold text-slate-900 text-sm">
               {{ data.name }}
@@ -135,15 +168,30 @@
           </template>
         </Column>
 
-        <Column header="المرافقين" sortable style="width: 12%;">
+        <Column field="families_count" header="المرافقين (الدعوات)" sortable style="width: 15%;">
           <template #body="{ data }">
-            <span class="font-mono font-bold text-slate-700 text-xs">
-              {{ (data.families || []).length }} أفراد
-            </span>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="font-mono font-bold text-slate-700 text-xs">
+                {{ data.families_count }} أفراد
+              </span>
+              <span
+                v-if="data.families_count > 4"
+                class="bg-purple-100 text-purple-800 border border-purple-200 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                title="طالب بفئة دعوات خاصة (أكثر من 4 دعوات)"
+              >
+                ★ {{ data.families_count }} دعوات
+              </span>
+              <span
+                v-else
+                class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+              >
+                {{ data.families_count }} دعوات
+              </span>
+            </div>
           </template>
         </Column>
 
-        <Column header="إجمالي الأفراد" sortable style="width: 12%;">
+        <Column field="persons_count" header="إجمالي الأفراد" sortable style="width: 12%;">
           <template #body="{ data }">
             <span class="font-mono font-black text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs">
               {{ data.persons_count }} فرد
@@ -151,7 +199,7 @@
           </template>
         </Column>
 
-        <Column header="حالة التسكين" style="width: 15%;">
+        <Column field="bus_number" header="حالة التسكين" sortable style="width: 14%;">
           <template #body="{ data }">
             <Tag
               v-if="data.bus_number"
@@ -511,17 +559,42 @@ const importPreview = ref(null);
 const importMode = ref('skip'); // 'skip' | 'update'
 const executingImport = ref(false);
 
+const invitationFilter = ref('all'); // 'all' | 'regular' (<=4) | 'special' (>4)
+
+const regularStudentsCount = computed(() => {
+  return store.students.filter(s => (s.families || []).length <= 4).length;
+});
+
+const specialStudentsCount = computed(() => {
+  return store.students.filter(s => (s.families || []).length > 4).length;
+});
+
 const filteredStudentsList = computed(() => {
   const query = (searchTerm.value || '').trim();
-  if (!query) return store.students;
+  const invFilter = invitationFilter.value;
 
-  return store.students.filter(s => {
-    const matchNum = String(s.military_number).includes(query) ||
-      normalizeArabic(s.military_number).includes(normalizeArabic(query));
-    const matchName = matchesArabicQuery(s.name, query);
-    const matchFam = (s.families || []).some(m => matchesArabicQuery(m.name, query));
-    return matchNum || matchName || matchFam;
-  });
+  return store.students
+    .map(s => {
+      const fCount = (s.families || []).length;
+      return {
+        ...s,
+        families_count: fCount,
+        is_special: fCount > 4
+      };
+    })
+    .filter(s => {
+      // Invitation category filter
+      if (invFilter === 'regular' && s.families_count > 4) return false;
+      if (invFilter === 'special' && s.families_count <= 4) return false;
+
+      if (!query) return true;
+
+      const matchNum = String(s.military_number).includes(query) ||
+        normalizeArabic(s.military_number).includes(normalizeArabic(query));
+      const matchName = matchesArabicQuery(s.name, query);
+      const matchFam = (s.families || []).some(m => matchesArabicQuery(m.name, query));
+      return matchNum || matchName || matchFam;
+    });
 });
 
 function openAddStudentModal() {

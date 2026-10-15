@@ -18,6 +18,7 @@ export const useBusesStore = defineStore('buses', {
     pollTimer: null,
     searchQuery: '',
     statusFilter: 'all', // 'all' | 'arrived' | 'not_arrived'
+    invitationFilter: 'all', // 'all' | 'regular' (<=4) | 'special' (>4)
     busFilter: null,
     lastChosenBus: Number(localStorage.getItem('autobus_last_bus')) || 1,
     actionLoading: false,
@@ -48,13 +49,31 @@ export const useBusesStore = defineStore('buses', {
       let totalPersons = 0;
       let arrivedPersons = 0;
       let partialAttendanceStudents = 0;
+      let regularStudents = 0;
+      let specialStudents = 0;
+      let arrivedRegularStudents = 0;
+      let arrivedSpecialStudents = 0;
 
       for (const s of state.students) {
-        const persons = s.persons_count || (1 + (s.families ? s.families.length : 0));
+        const memCount = (s.families ? s.families.length : 0);
+        const persons = s.persons_count || (1 + memCount);
         totalPersons += (s.total_registered_persons || persons);
+
+        if (memCount > 4) {
+          specialStudents += 1;
+        } else {
+          regularStudents += 1;
+        }
+
         if (s.bus_number) {
           arrivedStudents += 1;
           arrivedPersons += persons;
+
+          if (memCount > 4) {
+            arrivedSpecialStudents += 1;
+          } else {
+            arrivedRegularStudents += 1;
+          }
 
           const hasFamilies = s.families && s.families.length > 0;
           if (hasFamilies && s.families.some(m => !m.attended)) {
@@ -70,7 +89,13 @@ export const useBusesStore = defineStore('buses', {
         totalPersons,
         arrivedPersons,
         remainingPersons: totalPersons - arrivedPersons,
-        partialAttendanceStudents
+        partialAttendanceStudents,
+        regularStudents,
+        specialStudents,
+        arrivedRegularStudents,
+        arrivedSpecialStudents,
+        remainingRegularStudents: regularStudents - arrivedRegularStudents,
+        remainingSpecialStudents: specialStudents - arrivedSpecialStudents
       };
     },
 
@@ -79,8 +104,16 @@ export const useBusesStore = defineStore('buses', {
       const query = (state.searchQuery || '').trim();
       const status = state.statusFilter;
       const bus = state.busFilter;
+      const invFilter = state.invitationFilter;
 
-      return state.students.filter(student => {
+      return state.students.map(student => {
+        const fCount = (student.families || []).length;
+        return {
+          ...student,
+          families_count: fCount,
+          is_special: fCount > 4
+        };
+      }).filter(student => {
         // Status filter
         if (status === 'arrived' && !student.bus_number) return false;
         if (status === 'not_arrived' && student.bus_number) return false;
@@ -89,6 +122,10 @@ export const useBusesStore = defineStore('buses', {
           const hasAbsent = hasMembers && student.families.some(m => !m.attended);
           if (!student.bus_number || !hasAbsent) return false;
         }
+
+        // Invitation category filter
+        if (invFilter === 'regular' && student.families_count > 4) return false;
+        if (invFilter === 'special' && student.families_count <= 4) return false;
 
         // Bus filter
         if (bus !== null && bus !== '' && student.bus_number !== Number(bus)) return false;

@@ -22,6 +22,23 @@
               رقم: {{ student.military_number }}
             </span>
           </h3>
+
+          <!-- Student invitation category badge -->
+          <div class="mt-2 flex items-center gap-2">
+            <span
+              v-if="(student.families || []).length > 4"
+              class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-bold shadow-xs"
+            >
+              <i class="pi pi-star-fill text-[11px] text-purple-600"></i>
+              <span>فئة دعوات خاصة (★ {{ (student.families || []).length }} دعوات — يحجز من عداد الـ 2 بالأوتوبيس)</span>
+            </span>
+            <span
+              v-else
+              class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold"
+            >
+              <span>فئة عادية ({{ (student.families || []).length }} دعوات — يحجز من عداد الـ 7 بالأوتوبيس)</span>
+            </span>
+          </div>
         </div>
 
         <!-- Family persons pill -->
@@ -193,7 +210,7 @@
               ]"
             >
               <!-- Card Top: Bus number & Status Tag -->
-              <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2.5">
                   <div
                     :class="[
@@ -246,12 +263,28 @@
                 </div>
               </div>
 
+              <!-- Category Counters: <= 4 and > 4 -->
+              <div class="grid grid-cols-2 gap-1.5 p-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] font-bold mb-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-600">≤ 4 دعوات:</span>
+                  <span class="font-mono text-xs font-black" :class="bus.regularFamiliesCount >= bus.maxRegularFamilies ? 'text-amber-600' : 'text-emerald-700'">
+                    {{ bus.regularFamiliesCount }}/{{ bus.maxRegularFamilies }}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between border-s border-slate-200 ps-1.5">
+                  <span class="text-purple-900">★ > 4:</span>
+                  <span class="font-mono text-xs font-black" :class="bus.specialFamiliesCount >= bus.maxSpecialFamilies ? 'text-purple-900' : 'text-purple-700'">
+                    {{ bus.specialFamiliesCount }}/{{ bus.maxSpecialFamilies }}
+                  </span>
+                </div>
+              </div>
+
               <!-- Card Bottom: Counts & Progress Bars -->
               <div class="space-y-1.5 text-xs">
                 <!-- Families Progress -->
                 <div>
                   <div class="flex justify-between items-center text-slate-600 mb-0.5">
-                    <span class="font-bold text-[10px]">العائلات:</span>
+                    <span class="font-bold text-[10px]">إجمالي العائلات:</span>
                     <span class="font-mono font-bold text-[11px]">
                       {{ bus.familiesCount }} / {{ bus.maxFamilies }}
                     </span>
@@ -384,6 +417,7 @@ const canConfirm = computed(() => {
 const enrichedBuses = computed(() => {
   const currentBus = props.student?.bus_number;
   const pCount = familyPersonsCount.value;
+  const isStudentSpecial = (props.student?.families || []).length > 4;
 
   return store.buses.map(bus => {
     const isCurrent = currentBus === bus.number;
@@ -397,8 +431,22 @@ const enrichedBuses = computed(() => {
       ? Math.max(0, bus.personsCount - pCount)
       : bus.personsCount;
 
+    const maxRegular = bus.maxRegularFamilies !== undefined ? bus.maxRegularFamilies : (store.settings.defaultMaxRegularFamilies || 7);
+    const maxSpecial = bus.maxSpecialFamilies !== undefined ? bus.maxSpecialFamilies : (store.settings.defaultMaxSpecialFamilies || 2);
+
+    const effectiveRegular = (isMoveMode.value && isCurrent && !isStudentSpecial)
+      ? Math.max(0, (bus.regularFamiliesCount || 0) - 1)
+      : (bus.regularFamiliesCount || 0);
+
+    const effectiveSpecial = (isMoveMode.value && isCurrent && isStudentSpecial)
+      ? Math.max(0, (bus.specialFamiliesCount || 0) - 1)
+      : (bus.specialFamiliesCount || 0);
+
     const exceedFamilies = effectiveFamilies + 1 > bus.maxFamilies;
     const exceedPersons = effectivePersons + pCount > bus.maxPersons;
+    const exceedCategory = isStudentSpecial
+      ? (effectiveSpecial + 1 > maxSpecial)
+      : (effectiveRegular + 1 > maxRegular);
 
     let isDisabled = false;
     let disableReason = '';
@@ -406,6 +454,11 @@ const enrichedBuses = computed(() => {
     if (isMoveMode.value && isCurrent) {
       isDisabled = true;
       disableReason = 'الأتوبيس الحالي';
+    } else if (exceedCategory) {
+      isDisabled = true;
+      disableReason = isStudentSpecial
+        ? `اكتمل حد عائلات > 4 دعوات (${maxSpecial}/${maxSpecial})`
+        : `اكتمل حد عائلات ≤ 4 دعوات (${maxRegular}/${maxRegular})`;
     } else if (exceedFamilies) {
       isDisabled = true;
       disableReason = 'اكتمل عدد العائلات';
@@ -416,10 +469,14 @@ const enrichedBuses = computed(() => {
 
     return {
       ...bus,
+      maxRegularFamilies: maxRegular,
+      maxSpecialFamilies: maxSpecial,
+      regularFamiliesCount: bus.regularFamiliesCount || 0,
+      specialFamiliesCount: bus.specialFamiliesCount || 0,
       isCurrentBus: isCurrent,
       isDisabled,
       disableReason,
-      isFull: bus.familiesCount >= bus.maxFamilies || bus.personsCount >= bus.maxPersons
+      isFull: bus.familiesCount >= bus.maxFamilies || bus.personsCount >= bus.maxPersons || (effectiveRegular >= maxRegular && effectiveSpecial >= maxSpecial)
     };
   });
 });
