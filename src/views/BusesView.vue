@@ -19,7 +19,7 @@
         </div>
       </div>
 
-      <!-- Action Buttons -->
+      <!-- Action Buttons
       <div class="flex items-center gap-2.5 flex-wrap">
         <Button
           label="طباعة كل الأتوبيسات"
@@ -27,7 +27,7 @@
           class="!bg-slate-900 !border-slate-900 !text-white font-bold text-xs sm:text-sm shadow-md hover:!bg-slate-800 transition"
           @click="openPrintDialog(null)"
         />
-      </div>
+      </div> -->
     </div>
 
     <!-- Filter & Search Toolbar -->

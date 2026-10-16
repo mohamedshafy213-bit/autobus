@@ -15,13 +15,13 @@
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-2 flex-wrap">
-        <Button
+        <!-- <Button
           label="تحميل نسخة احتياطية (.db)"
           icon="pi pi-download"
           class="!bg-slate-800 !border-slate-800 !text-white font-bold text-xs hover:!bg-slate-900 shadow-sm"
           title="تحميل نسخة كاملة من قاعدة بيانات المنظومة"
           @click="downloadBackup"
-        />
+        /> -->
 
         <Button
           label="تصفير الحضور (إخلاء المقاعد)"
@@ -36,7 +36,7 @@
       </div>
     </div>
 
-    <!-- Automatic Seating (تسكين تلقائي) Toggle Card -->
+    <!-- Automatic Seating (تسكين تلقائي) Toggle Card
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div class="space-y-1">
         <div class="flex items-center gap-2">
@@ -71,7 +71,7 @@
           @click="toggleAutoSeating"
         />
       </div>
-    </div>
+    </div> -->
 
     <!-- Backup Server & Failover Card (السيرفر الاحتياطي وإدارة الطوارئ) -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">

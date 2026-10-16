@@ -64,14 +64,14 @@
                 <td colspan="3" class="student-title-cell">
                   <div class="flex items-center justify-between">
                     <span class="font-black text-black text-xs">
-                      🎓 الطالب: {{ slot.student ? slot.student.name : '............................................................' }}
+                        ملازم ⭐: {{ slot.student ? slot.student.name : '............................................................' }}
                     </span>
                     <span class="text-[10.5px] font-mono text-gray-800">
                       <template v-if="slot.student">
-                        رقم عسكري: {{ slot.student.military_number }} | الحاضرين بالأتوبيس: {{ slot.student.persons_count }} فرد
+                        الحاضرين بالأتوبيس: {{ slot.student.persons_count }} فرد
                       </template>
                       <template v-else>
-                        رقم عسكري: .................. | الحاضرين: .... فرد
+                       الحاضرين: .... فرد
                       </template>
                     </span>
                   </div>
@@ -134,23 +134,18 @@
             / {{ page.bus.maxFamilies }} عائلة
           </div>
           <div>
-            إجمالي الأفراد الحاضرين:
-            <span class="text-black font-black mx-1">{{ page.bus.personsCount }}</span>
-            / {{ page.bus.maxPersons }} فرد
-          </div>
-          <div>
-            المقاعد المتبقية:
-            <span class="text-black font-black mx-1">{{ Math.max(0, page.bus.maxPersons - page.bus.personsCount) }}</span>
-            مقعد
+            اجمالي عدد افراد الاسر الحاضرين:
+            <span class="text-black font-black mx-1">{{ page.bus.personsCount-page.bus.familiesCount }}</span>
+             فرد
           </div>
         </div>
 
-        <!-- Signature Line: قائد المأمورية -->
-        <div class="flex justify-center text-center text-xs">
-          <div class="border-t border-black pt-0.5 w-64">
+        <!-- Signature Line: قائد المأمورية (Aligned to the left) -->
+        <div class="flex justify-end text-center text-xs">
+          <div class="border-t border-black pt-0.5 w-64 mr-auto text-center">
             <span class="font-bold block text-xs">قائد المأمورية</span>
-            <span class="text-gray-800 text-xs block mb-1 font-bold">({{ staffData.manager || '.......................' }})</span>
-            <span class="text-gray-500 block text-[9.5px]">التوقيع: ............................</span>
+            <span class="text-gray-800 text-xs block mb-1 font-bold">{{ staffData.manager || '.......................' }}</span>
+            <span class="text-gray-500 block text-[9.5px] mt-2">التوقيع: ............................</span>
           </div>
         </div>
       </div>
